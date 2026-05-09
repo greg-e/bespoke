@@ -135,6 +135,86 @@ create table if not exists public.task_review_notes (
   created_at timestamptz not null default now()
 );
 
+-- Align partially-existing legacy tables to this schema before indexes/policies.
+alter table if exists public.profiles
+  add column if not exists email text,
+  add column if not exists display_name text,
+  add column if not exists avatar_url text,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+alter table if exists public.events
+  add column if not exists title text,
+  add column if not exists notes text,
+  add column if not exists starts_at timestamptz,
+  add column if not exists ends_at timestamptz,
+  add column if not exists is_shared boolean default false,
+  add column if not exists created_by uuid references auth.users (id) on delete cascade,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+alter table if exists public.tasks
+  add column if not exists title text,
+  add column if not exists notes text,
+  add column if not exists status public.task_status default 'not_started',
+  add column if not exists due_date date,
+  add column if not exists duration_minutes integer,
+  add column if not exists is_pinned boolean default false,
+  add column if not exists recurrence_rule text,
+  add column if not exists recurrence_paused boolean default false,
+  add column if not exists event_id uuid references public.events (id) on delete set null,
+  add column if not exists created_by uuid references auth.users (id) on delete cascade,
+  add column if not exists assigned_to uuid references auth.users (id) on delete set null,
+  add column if not exists is_linked_to_event boolean default false,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+alter table if exists public.event_members
+  add column if not exists role public.event_member_role default 'member',
+  add column if not exists created_at timestamptz default now();
+
+alter table if exists public.event_checklist_items
+  add column if not exists title text,
+  add column if not exists completed boolean default false,
+  add column if not exists converted_task_id uuid references public.tasks (id) on delete set null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+alter table if exists public.attachments
+  add column if not exists parent_type public.parent_type,
+  add column if not exists parent_id uuid,
+  add column if not exists file_name text,
+  add column if not exists file_url text,
+  add column if not exists mime_type text,
+  add column if not exists file_size_bytes bigint,
+  add column if not exists created_by uuid references auth.users (id) on delete cascade,
+  add column if not exists created_at timestamptz default now();
+
+alter table if exists public.comments
+  add column if not exists parent_type public.parent_type,
+  add column if not exists parent_id uuid,
+  add column if not exists body text,
+  add column if not exists created_by uuid references auth.users (id) on delete cascade,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+alter table if exists public.notification_preferences
+  add column if not exists morning_time text default '08:00',
+  add column if not exists evening_time text default '16:00',
+  add column if not exists morning_enabled boolean default true,
+  add column if not exists evening_enabled boolean default true,
+  add column if not exists morning_snooze_minutes integer default 15,
+  add column if not exists evening_snooze_minutes integer default 15,
+  add column if not exists updated_at timestamptz default now();
+
+alter table if exists public.task_review_notes
+  add column if not exists task_id uuid references public.tasks (id) on delete cascade,
+  add column if not exists review_date date default current_date,
+  add column if not exists reason text,
+  add column if not exists notes text,
+  add column if not exists created_by uuid references auth.users (id) on delete cascade,
+  add column if not exists created_at timestamptz default now();
+
 create index if not exists events_created_by_idx on public.events (created_by, starts_at);
 create index if not exists event_members_user_idx on public.event_members (user_id, event_id);
 create index if not exists tasks_created_by_idx on public.tasks (created_by, due_date, status);
