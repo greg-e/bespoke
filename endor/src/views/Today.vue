@@ -127,6 +127,10 @@ const openTasks = computed(() => tasks.value.filter((task) => task.status !== 'd
 const openTaskCount = computed(() => openTasks.value.length)
 const displayedSuggestedTasks = computed(() => dashboard.suggestedTasks.slice(0, selectedCapacity.value))
 const dataConnectionGuidance = computed(() => {
+  if (dashboard.usingCachedData) {
+    return 'Showing your last saved Today snapshot. Refresh when your connection is restored.'
+  }
+
   const normalized = String(dashboard.error ?? '').toLowerCase()
 
   if (normalized.includes('does not exist') || normalized.includes('relation') || normalized.includes('schema')) {

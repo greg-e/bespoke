@@ -1,6 +1,6 @@
 # Design Q&A Log
 
-Updated: 2026-05-09
+Updated: 2026-05-10
 
 ## Purpose
 
@@ -33,6 +33,7 @@ Use this as a running source of truth to find gaps quickly during iterative UI c
 | QA-012 | Views should have a single header and no explanation text. | Simplified view headers to one title line where applicable. | Done | src/views/Today.vue, src/views/Tasks.vue, src/views/Calendar.vue, src/views/Settings.vue | Re-check newly added views for consistency. |
 | QA-013 | Open a task just like opening an event. | Added dedicated task detail route and updated list/open interactions to route to task detail. | Done | src/views/TaskDetail.vue, src/views/Tasks.vue, src/router/index.js, src/views/Today.vue | None. |
 | QA-014 | Missing capacity selection for Today. | Added Today capacity slider and list-size control. Persistence approach still needs product decision. | Needs Verification | src/views/Today.vue, src/stores/dashboard.js, src/lib/dashboard.js | Decide whether capacity belongs in Settings with server persistence or remains a Today-local control. |
+| QA-015 | How might we make this app durable and deterministic? | Use per-user local snapshot fallback for Today data during transient failures, and deterministic task ranking with stable tie-breakers plus a single captured clock per refresh. | Done | src/stores/dashboard.js, src/lib/dashboard.js, src/views/Today.vue | Add automated coverage once test tooling is introduced. |
 
 ## Active Gaps To Watch
 

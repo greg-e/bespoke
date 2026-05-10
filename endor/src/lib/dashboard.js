@@ -1,6 +1,30 @@
 import { listEvents } from './events'
 import { listTasks } from './tasks'
 
+function parseDateValue(value) {
+  const parsed = new Date(value)
+  const time = parsed.getTime()
+  return Number.isNaN(time) ? null : parsed
+}
+
+function toCreatedAtTime(task) {
+  const parsed = parseDateValue(task.created_at)
+  return parsed ? parsed.getTime() : Number.POSITIVE_INFINITY
+}
+
+export function compareTasksDeterministically(left, right) {
+  if (right.score !== left.score) return right.score - left.score
+
+  if ((left.duration_minutes ?? 999) !== (right.duration_minutes ?? 999)) {
+    return (left.duration_minutes ?? 999) - (right.duration_minutes ?? 999)
+  }
+
+  const createdAtDiff = toCreatedAtTime(left) - toCreatedAtTime(right)
+  if (createdAtDiff !== 0) return createdAtDiff
+
+  return String(left.id ?? '').localeCompare(String(right.id ?? ''))
+}
+
 export function startOfDay(date = new Date()) {
   const value = new Date(date)
   value.setHours(0, 0, 0, 0)
@@ -72,29 +96,24 @@ export function suggestTopTasks(tasks, options = {}) {
         reasons,
       }
     })
-    .sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score
-      if ((left.duration_minutes ?? 999) !== (right.duration_minutes ?? 999)) {
-        return (left.duration_minutes ?? 999) - (right.duration_minutes ?? 999)
-      }
-      return new Date(left.created_at) - new Date(right.created_at)
-    })
+    .sort(compareTasksDeterministically)
     .slice(0, limit)
 }
 
 export async function loadTodayDashboard(options = {}) {
+  const now = options.now ?? new Date()
   const suggestionLimit = Number.isFinite(options.suggestionLimit)
     ? Math.max(1, options.suggestionLimit)
     : 8
 
   const [tasks, events] = await Promise.all([
     listTasks({ excludeDone: true }),
-    listEvents({ from: startOfDay(), to: endOfDay() }),
+    listEvents({ from: startOfDay(now), to: endOfDay(now) }),
   ])
 
   return {
     tasks,
     events,
-    suggestedTasks: suggestTopTasks(tasks, { limit: suggestionLimit }),
+    suggestedTasks: suggestTopTasks(tasks, { limit: suggestionLimit, now }),
   }
 }
