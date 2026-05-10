@@ -1,0 +1,3 @@
+Smoke test attachment file
+Created by Copilot for upload/delete verification.
+Timestamp: 2026-05-09

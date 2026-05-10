@@ -27,7 +27,9 @@ export function isWithinThisWeek(date, now = new Date()) {
   return date >= start && date <= end
 }
 
-export function suggestTopTasks(tasks, now = new Date()) {
+export function suggestTopTasks(tasks, options = {}) {
+  const now = options.now ?? new Date()
+  const limit = Number.isFinite(options.limit) ? Math.max(1, options.limit) : 3
   const today = startOfDay(now)
 
   return tasks
@@ -77,10 +79,14 @@ export function suggestTopTasks(tasks, now = new Date()) {
       }
       return new Date(left.created_at) - new Date(right.created_at)
     })
-    .slice(0, 3)
+    .slice(0, limit)
 }
 
-export async function loadTodayDashboard() {
+export async function loadTodayDashboard(options = {}) {
+  const suggestionLimit = Number.isFinite(options.suggestionLimit)
+    ? Math.max(1, options.suggestionLimit)
+    : 8
+
   const [tasks, events] = await Promise.all([
     listTasks({ excludeDone: true }),
     listEvents({ from: startOfDay(), to: endOfDay() }),
@@ -89,6 +95,6 @@ export async function loadTodayDashboard() {
   return {
     tasks,
     events,
-    suggestedTasks: suggestTopTasks(tasks),
+    suggestedTasks: suggestTopTasks(tasks, { limit: suggestionLimit }),
   }
 }

@@ -15,6 +15,49 @@ export const attachmentFields = `
   created_at
 `
 
+function sanitizeFileName(fileName) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+export function buildAttachmentPath({ parentType, parentId, userId, fileName }) {
+  const safeName = sanitizeFileName(fileName)
+  const stamp = Date.now()
+  return `${parentType}/${parentId}/${userId}/${stamp}-${safeName}`
+}
+
+export function resolveAttachmentUrl(fileUrl, bucket = attachmentsBucket) {
+  if (!fileUrl) return ''
+  if (/^https?:\/\//i.test(fileUrl)) return fileUrl
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(fileUrl)
+  return data?.publicUrl || fileUrl
+}
+
+export function extractStoragePath(fileUrl, bucket = attachmentsBucket) {
+  if (!fileUrl) return null
+  if (!/^https?:\/\//i.test(fileUrl)) return fileUrl
+
+  try {
+    const parsed = new URL(fileUrl)
+    const patterns = [
+      `/storage/v1/object/public/${bucket}/`,
+      `/storage/v1/object/sign/${bucket}/`,
+      `/storage/v1/object/${bucket}/`,
+    ]
+
+    for (const marker of patterns) {
+      const index = parsed.pathname.indexOf(marker)
+      if (index !== -1) {
+        return decodeURIComponent(parsed.pathname.slice(index + marker.length))
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 export async function listAttachments(parentType, parentId) {
   return unwrap(
     supabase
@@ -50,6 +93,20 @@ export async function uploadAttachmentFile({ bucket = attachmentsBucket, path, f
   return unwrap(supabase.storage.from(bucket).upload(path, file, { upsert: false }))
 }
 
+export async function deleteAttachmentFile(path, bucket = attachmentsBucket) {
+  return unwrap(supabase.storage.from(bucket).remove([path]))
+}
+
 export async function deleteAttachment(id) {
   return unwrap(supabase.from('attachments').delete().eq('id', id))
+}
+
+export async function deleteAttachmentAndFile(attachment, bucket = attachmentsBucket) {
+  const storagePath = extractStoragePath(attachment.file_url, bucket)
+
+  if (storagePath) {
+    await deleteAttachmentFile(storagePath, bucket)
+  }
+
+  return deleteAttachment(attachment.id)
 }

@@ -1,18 +1,21 @@
 :root {
-  --bg: #f7f6fb;
-  --surface: rgba(255, 255, 255, 0.9);
-  --panel-bg: #ffffff;
-  --border: rgba(85, 77, 108, 0.12);
-  --text: #5e5a6e;
-  --text-strong: #1d1727;
-  --muted: #7e7a90;
-  --accent: #7c3aed;
-  --pill-bg: rgba(124, 58, 237, 0.1);
-  --shadow-soft: 0 12px 30px rgba(34, 24, 61, 0.08);
+  --bg: #f6f1e6;
+  --surface: rgba(255, 252, 245, 0.9);
+  --panel-bg: #fffdf8;
+  --border: rgba(125, 94, 45, 0.18);
+  --text: #584930;
+  --text-strong: #2f2618;
+  --muted: #8a7554;
+  --accent: #b8872f;
+  --pill-bg: rgba(184, 135, 47, 0.12);
+  --shadow-soft: 0 12px 30px rgba(61, 45, 20, 0.08);
 
-  font: 16px/1.5 Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-ui: 'Futura PT', Futura, 'Avenir Next', Avenir, 'Century Gothic', sans-serif;
+  --font-tech: 'Eurostile LT Std', Eurostile, 'Microgramma D Extended', Microgramma, 'Square 721', 'Bank Gothic', sans-serif;
+
+  font: 16px/1.5 var(--font-ui);
   color: var(--text);
-  background: radial-gradient(circle at top, #ffffff 0%, var(--bg) 55%, #eeeaf8 100%);
+  background: radial-gradient(circle at top, #fffdf8 0%, var(--bg) 55%, #efe6d4 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -28,6 +31,7 @@ body,
 
 body {
   min-height: 100svh;
+  font-family: var(--font-ui);
 }
 
 * {
@@ -39,6 +43,21 @@ h2,
 h3,
 p {
   margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-ui);
+}
+
+.eyebrow,
+.pill,
+button,
+.chip-action,
+.chip-link {
+  font-family: var(--font-tech);
+  letter-spacing: 0.02em;
 }
 
 button,
@@ -59,6 +78,6 @@ a {
 }
 
 ::selection {
-  background: rgba(124, 58, 237, 0.18);
+  background: rgba(184, 135, 47, 0.2);
   color: var(--text-strong);
 }

@@ -5,15 +5,11 @@ import { RouterLink, RouterView } from 'vue-router'
 <template>
   <div class="app-shell">
     <header class="app-header">
-      <div>
-        <p class="brand-kicker">Private productivity starter</p>
-        <h1>endor</h1>
-      </div>
-
       <nav class="nav">
         <RouterLink to="/today">Today</RouterLink>
         <RouterLink to="/tasks">Tasks</RouterLink>
         <RouterLink to="/calendar">Calendar</RouterLink>
+        <RouterLink to="/settings">Settings</RouterLink>
       </nav>
     </header>
 
@@ -39,20 +35,6 @@ import { RouterLink, RouterView } from 'vue-router'
   border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(18px);
-}
-
-.brand-kicker {
-  margin: 0 0 4px;
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-h1 {
-  margin: 0;
-  font-size: 24px;
-  letter-spacing: -0.04em;
 }
 
 .nav {

@@ -12,12 +12,14 @@ export const useDashboardStore = defineStore('dashboard', {
   actions: {
     async refresh() {
       this.loading = true
+      this.error = null
 
       try {
-        const data = await loadTodayDashboard()
+        const data = await loadTodayDashboard({ suggestionLimit: 12 })
         this.tasks = data.tasks
         this.events = data.events
         this.suggestedTasks = data.suggestedTasks
+        this.error = null
       } catch (error) {
         this.error = error?.message ?? String(error)
       } finally {

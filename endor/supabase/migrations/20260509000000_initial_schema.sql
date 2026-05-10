@@ -1,6 +1,7 @@
 create extension if not exists pgcrypto;
 
 create type public.task_status as enum ('not_started', 'in_progress', 'done');
+create type public.task_priority as enum ('low', 'medium', 'high');
 create type public.event_member_role as enum ('owner', 'member', 'viewer');
 create type public.parent_type as enum ('task', 'event');
 create type public.recurrence_kind as enum ('daily', 'weekly', 'monthly');
@@ -67,6 +68,7 @@ create table if not exists public.tasks (
   title text not null,
   notes text,
   status public.task_status not null default 'not_started',
+  priority public.task_priority not null default 'medium',
   due_date date,
   duration_minutes integer,
   is_pinned boolean not null default false,
@@ -157,6 +159,7 @@ alter table if exists public.tasks
   add column if not exists title text,
   add column if not exists notes text,
   add column if not exists status public.task_status default 'not_started',
+  add column if not exists priority public.task_priority default 'medium',
   add column if not exists due_date date,
   add column if not exists duration_minutes integer,
   add column if not exists is_pinned boolean default false,
@@ -252,6 +255,23 @@ create trigger handle_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
 
+-- Helper functions that bypass RLS to break circular dependency between events and event_members policies
+create or replace function public.is_event_member(p_event_id uuid)
+returns boolean language sql security definer stable as $$
+  select exists (
+    select 1 from public.event_members
+    where event_id = p_event_id and user_id = auth.uid()
+  );
+$$;
+
+create or replace function public.is_event_owner(p_event_id uuid)
+returns boolean language sql security definer stable as $$
+  select exists (
+    select 1 from public.events
+    where id = p_event_id and created_by = auth.uid()
+  );
+$$;
+
 alter table public.profiles enable row level security;
 alter table public.events enable row level security;
 alter table public.event_members enable row level security;
@@ -285,15 +305,7 @@ create policy "events read own or shared"
 on public.events
 for select
 to authenticated
-using (
-  created_by = auth.uid()
-  or exists (
-    select 1
-    from public.event_members em
-    where em.event_id = events.id
-      and em.user_id = auth.uid()
-  )
-);
+using (created_by = auth.uid() or public.is_event_member(events.id));
 
 create policy "events insert own"
 on public.events
@@ -305,24 +317,8 @@ create policy "events update own or member"
 on public.events
 for update
 to authenticated
-using (
-  created_by = auth.uid()
-  or exists (
-    select 1
-    from public.event_members em
-    where em.event_id = events.id
-      and em.user_id = auth.uid()
-  )
-)
-with check (
-  created_by = auth.uid()
-  or exists (
-    select 1
-    from public.event_members em
-    where em.event_id = events.id
-      and em.user_id = auth.uid()
-  )
-);
+using (created_by = auth.uid() or public.is_event_member(events.id))
+with check (created_by = auth.uid() or public.is_event_member(events.id));
 
 create policy "events delete own"
 on public.events
@@ -334,72 +330,26 @@ create policy "event members read for related event"
 on public.event_members
 for select
 to authenticated
-using (
-  user_id = auth.uid()
-  or exists (
-    select 1
-    from public.events e
-    where e.id = event_members.event_id
-      and e.created_by = auth.uid()
-  )
-  or exists (
-    select 1
-    from public.event_members em
-    where em.event_id = event_members.event_id
-      and em.user_id = auth.uid()
-  )
-);
+using (user_id = auth.uid() or public.is_event_owner(event_members.event_id));
 
 create policy "event members insert by owner"
 on public.event_members
 for insert
 to authenticated
-with check (
-  exists (
-    select 1
-    from public.events e
-    where e.id = event_id
-      and e.created_by = auth.uid()
-  )
-  or user_id = auth.uid()
-);
+with check (user_id = auth.uid() or public.is_event_owner(event_id));
 
 create policy "event members update by owner or self"
 on public.event_members
 for update
 to authenticated
-using (
-  exists (
-    select 1
-    from public.events e
-    where e.id = event_members.event_id
-      and e.created_by = auth.uid()
-  )
-  or user_id = auth.uid()
-)
-with check (
-  exists (
-    select 1
-    from public.events e
-    where e.id = event_members.event_id
-      and e.created_by = auth.uid()
-  )
-  or user_id = auth.uid()
-);
+using (user_id = auth.uid() or public.is_event_owner(event_members.event_id))
+with check (user_id = auth.uid() or public.is_event_owner(event_members.event_id));
 
 create policy "event members delete by owner or self"
 on public.event_members
 for delete
 to authenticated
-using (
-  exists (
-    select 1
-    from public.events e
-    where e.id = event_members.event_id
-      and e.created_by = auth.uid()
-  )
-  or user_id = auth.uid()
-);
+using (user_id = auth.uid() or public.is_event_owner(event_members.event_id));
 
 create policy "tasks read own or linked event"
 on public.tasks

@@ -1,58 +1,62 @@
 <template>
   <section class="today-view">
     <header class="hero">
-      <div>
-        <p class="eyebrow">Today</p>
-        <h1>Your focus for the day</h1>
-        <p class="muted">Choose your Top 3, scan overdue work, and stay on top of event-based projects.</p>
-      </div>
+      <h1>Today</h1>
 
-      <button class="primary" type="button" @click="refresh">Refresh</button>
+      <div class="hero-actions">
+        <router-link class="primary cta-link" to="/tasks">+ Add task</router-link>
+        <button class="secondary" type="button" @click="refresh">Refresh</button>
+      </div>
     </header>
 
     <article v-if="dashboard.error" class="panel alert">
       <div>
         <p class="eyebrow">Data connection</p>
         <h2>Supabase data is not ready yet</h2>
-        <p class="muted">Apply <strong>supabase/migrations/20260509000000_initial_schema.sql</strong> in Supabase, then refresh the page.</p>
+        <p class="muted">{{ dataConnectionGuidance }}</p>
       </div>
       <pre class="error-box">{{ dashboard.error }}</pre>
-    </article>
-
-    <article class="panel auth-panel">
-      <div>
-        <p class="eyebrow">Account</p>
-        <h2>{{ session.user ? 'Signed in' : 'Sign in to sync' }}</h2>
-        <p class="muted" v-if="session.user">{{ session.user.email }}</p>
-        <p class="muted" v-else>Enter your email to get a magic link from Supabase Auth.</p>
-        <p v-if="session.error" class="error-text">{{ session.error }}</p>
-      </div>
-
-      <form v-if="!session.user" class="auth-form" @submit.prevent="handleSignIn">
-        <input v-model="email" type="email" placeholder="you@example.com" required />
-        <button class="primary" type="submit">Send magic link</button>
-      </form>
-
-      <button v-else class="secondary" type="button" @click="handleSignOut">Sign out</button>
     </article>
 
     <div class="dashboard-grid">
       <article class="panel">
         <div class="panel-head">
-          <h2>Suggested Top 3</h2>
-          <span class="pill">{{ dashboard.suggestedTasks.length }} suggestions</span>
+          <h2>Suggested Top {{ selectedCapacity }}</h2>
+          <div class="panel-head-actions">
+            <label class="capacity-control">
+              <span>Capacity</span>
+              <input
+                v-model.number="selectedCapacity"
+                type="range"
+                :min="capacityMin"
+                :max="capacityMax"
+                step="1"
+                aria-label="Capacity"
+              />
+              <strong class="capacity-value">{{ selectedCapacity }}</strong>
+            </label>
+            <span class="pill">{{ displayedSuggestedTasks.length }}/{{ dashboard.suggestedTasks.length }}</span>
+          </div>
         </div>
 
         <p v-if="dashboard.loading">Loading suggestions...</p>
-        <p v-else-if="!dashboard.suggestedTasks.length" class="muted">No suggestions yet.</p>
+        <p v-else-if="!displayedSuggestedTasks.length" class="muted">No suggestions yet.</p>
 
         <ul v-else class="list-card">
-          <li v-for="task in dashboard.suggestedTasks" :key="task.id">
+          <li v-for="task in displayedSuggestedTasks" :key="task.id">
             <div>
               <strong>{{ task.title }}</strong>
               <p class="muted small">{{ task.reasons.join(' · ') || 'Suggested from your work' }}</p>
             </div>
-            <span class="pill" v-if="task.duration_minutes">{{ task.duration_minutes }}m</span>
+            <div class="suggestion-actions">
+              <span class="pill" v-if="task.duration_minutes">{{ task.duration_minutes }}m</span>
+              <button class="chip-action" type="button" @click="setTaskStatus(task, 'in_progress')">Start</button>
+              <button class="chip-action" type="button" @click="setTaskStatus(task, 'done')">Done</button>
+              <button class="chip-action" type="button" @click="togglePinned(task)">
+                {{ task.is_pinned ? 'Unpin' : 'Pin' }}
+              </button>
+              <router-link class="chip-link" :to="`/task/${task.id}`">Open</router-link>
+            </div>
           </li>
         </ul>
       </article>
@@ -69,7 +73,12 @@
               <strong>{{ task.title }}</strong>
               <p class="muted small">{{ task.due_date || 'No due date' }}</p>
             </div>
-            <span class="pill">{{ task.status }}</span>
+            <div class="suggestion-actions">
+              <span class="pill">{{ formatTaskStatus(task.status) }}</span>
+              <button class="chip-action" type="button" @click="setTaskStatus(task, 'in_progress')">Start</button>
+              <button class="chip-action" type="button" @click="setTaskStatus(task, 'done')">Done</button>
+              <router-link class="chip-link" :to="`/task/${task.id}`">Open</router-link>
+            </div>
           </li>
         </ul>
         <p v-else class="muted">No open tasks right now.</p>
@@ -87,7 +96,10 @@
               <strong>{{ event.title }}</strong>
               <p class="muted small">{{ formatDateTime(event.starts_at) }}</p>
             </div>
-            <span class="pill" v-if="event.is_shared">Shared</span>
+            <div class="suggestion-actions">
+              <span class="pill" v-if="event.is_shared">Shared</span>
+              <router-link class="chip-link" :to="`/event/${event.id}`">Open event</router-link>
+            </div>
           </li>
         </ul>
         <p v-else class="muted">No events scheduled for today.</p>
@@ -97,19 +109,49 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '../stores/dashboard'
-import { useSessionStore } from '../stores/session'
+import { pinTask, toggleTaskStatus } from '../lib/tasks'
+
+const TODAY_CAPACITY_KEY = 'endor_today_capacity_v1'
+const capacityMin = 1
+const capacityMax = 6
 
 const dashboard = useDashboardStore()
-const session = useSessionStore()
-const email = ref('')
 
 const { tasks } = storeToRefs(dashboard)
+const selectedCapacity = ref(readCapacityPreference())
 
 const openTasks = computed(() => tasks.value.filter((task) => task.status !== 'done'))
 const openTaskCount = computed(() => openTasks.value.length)
+const displayedSuggestedTasks = computed(() => dashboard.suggestedTasks.slice(0, selectedCapacity.value))
+const dataConnectionGuidance = computed(() => {
+  const normalized = String(dashboard.error ?? '').toLowerCase()
+
+  if (normalized.includes('does not exist') || normalized.includes('relation') || normalized.includes('schema')) {
+    return 'Apply supabase/migrations/20260509000000_initial_schema.sql in Supabase, then refresh the page.'
+  }
+
+  return 'We could not load today data. Check your network/auth connection and try Refresh.'
+})
+
+watch(selectedCapacity, (value) => {
+  if (typeof window === 'undefined') return
+
+  window.localStorage.setItem(TODAY_CAPACITY_KEY, String(value))
+})
+
+function readCapacityPreference() {
+  if (typeof window === 'undefined') return 3
+
+  const raw = window.localStorage.getItem(TODAY_CAPACITY_KEY)
+  const parsed = Number.parseInt(raw ?? '', 10)
+
+  if (Number.isNaN(parsed) || parsed < capacityMin || parsed > capacityMax) return 3
+
+  return parsed
+}
 
 function formatDateTime(value) {
   const parsed = new Date(value)
@@ -125,20 +167,38 @@ function formatDateTime(value) {
   })
 }
 
+function formatTaskStatus(status) {
+  if (status === 'not_started') return 'Not started'
+  if (status === 'in_progress') return 'In progress'
+  if (status === 'done') return 'Done'
+  return status
+}
+
 async function refresh() {
   await dashboard.refresh()
 }
 
-async function handleSignIn() {
-  await session.emailSignIn(email.value)
-  email.value = ''
+async function togglePinned(task) {
+  try {
+    await pinTask(task.id, !task.is_pinned)
+    await refresh()
+  } catch (error) {
+    dashboard.error = error?.message ?? String(error)
+  }
 }
 
-async function handleSignOut() {
-  await session.logout()
+async function setTaskStatus(task, status) {
+  try {
+    await toggleTaskStatus(task.id, status)
+    await refresh()
+  } catch (error) {
+    dashboard.error = error?.message ?? String(error)
+  }
 }
 
-onMounted(refresh)
+onMounted(async () => {
+  await refresh()
+})
 </script>
 
 <style scoped>
@@ -153,6 +213,12 @@ onMounted(refresh)
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .auth-panel {
@@ -174,6 +240,87 @@ onMounted(refresh)
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.microsoft-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.microsoft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.account-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: var(--panel-bg);
+}
+
+.account-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.preferences-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preferences-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pref-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pref-row input[type='time'],
+.pref-row input[type='number'] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-bg);
+  color: var(--text-strong);
+}
+
+.pref-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ghost {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 700;
 }
 
 .eyebrow {
@@ -215,6 +362,10 @@ onMounted(refresh)
   border-radius: 999px;
   padding: 12px 18px;
   font-weight: 700;
+}
+
+.cta-link {
+  text-decoration: none;
 }
 
 .secondary {
@@ -261,6 +412,30 @@ onMounted(refresh)
   margin-bottom: 14px;
 }
 
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capacity-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.capacity-control input[type='range'] {
+  width: 120px;
+  accent-color: var(--accent);
+}
+
+.capacity-value {
+  min-width: 1ch;
+  color: var(--text-strong);
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -293,6 +468,37 @@ onMounted(refresh)
   border: 1px solid var(--border);
 }
 
+.list-card.compact li {
+  padding: 10px;
+}
+
+      .suggestion-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .chip-action {
+        border: 1px solid var(--border);
+        background: var(--panel-bg);
+        color: var(--text-strong);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+.chip-link {
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--text-strong);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
 .timeline li {
   align-items: flex-start;
 }
@@ -304,8 +510,31 @@ onMounted(refresh)
     flex-direction: column;
   }
 
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .microsoft-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pref-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pref-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
