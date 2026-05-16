@@ -162,15 +162,6 @@ h1 {
   gap: 1rem;
 }
 
-.intro-screen {
-  margin: 1rem 0;
-}
-
-.intro-card {
-  max-width: 760px;
-  margin: 0 auto;
-}
-
 .day-focus {
   border: 1px solid var(--line);
   border-radius: 12px;

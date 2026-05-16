@@ -8,7 +8,6 @@ const DATA_FILES = {
 }
 
 const STORAGE_PREFIX = 'gather-june-2026:'
-const INTRO_SEEN_KEY = STORAGE_PREFIX + 'intro-seen'
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   weekday: 'long',
   month: 'short',
@@ -20,18 +19,11 @@ const state = {
   selectedTab: 'home',
   selectedDay: null,
   usedCacheFallback: false,
-  showIntro: true,
 }
 
 const el = {
   title: document.getElementById('app-title'),
   subtitle: document.getElementById('app-subtitle'),
-  introScreen: document.getElementById('intro-screen'),
-  introLocationName: document.getElementById('intro-location-name'),
-  introLocationLine1: document.getElementById('intro-location-line1'),
-  introLocationLine2: document.getElementById('intro-location-line2'),
-  introMapLink: document.getElementById('intro-map-link'),
-  enterApp: document.getElementById('enter-app'),
   topNav: document.getElementById('top-nav'),
   statusStrip: document.getElementById('status-strip'),
   skeleton: document.getElementById('skeleton'),
@@ -39,10 +31,10 @@ const el = {
   tabs: [...document.querySelectorAll('.tab')],
   panels: {
     home: document.getElementById('panel-home'),
+    hangout: document.getElementById('panel-hangout'),
     location: document.getElementById('panel-location'),
     food: document.getElementById('panel-food'),
     schedule: document.getElementById('panel-schedule'),
-    assignments: document.getElementById('panel-assignments'),
   },
 }
 
@@ -67,16 +59,10 @@ async function bootstrap() {
   }
 
   state.selectedDay = pickInitialDay(state.data.site.content.dateRange)
-  state.showIntro = !sessionStorage.getItem(INTRO_SEEN_KEY)
 
   activateTabs()
   el.skeleton.classList.add('hidden')
-
-  if (state.showIntro) {
-    renderIntro()
-  } else {
-    showMainView()
-  }
+  showMainView()
 }
 
 async function loadJsonWithCache(key, path) {
@@ -111,31 +97,9 @@ function activateTabs() {
       render()
     })
   }
-
-  el.enterApp.addEventListener('click', () => {
-    sessionStorage.setItem(INTRO_SEEN_KEY, '1')
-    state.showIntro = false
-    showMainView()
-  })
-}
-
-function renderIntro() {
-  const site = state.data.site.content
-  el.title.textContent = site.title
-  el.subtitle.textContent = site.subtitle
-  el.introLocationName.textContent = site.location.name
-  el.introLocationLine1.textContent = site.location.addressLine1
-  el.introLocationLine2.textContent = site.location.addressLine2
-  el.introMapLink.href = site.location.mapOpenUrl
-
-  el.introScreen.classList.remove('hidden')
-  el.topNav.classList.add('hidden')
-  el.statusStrip.classList.add('hidden')
-  el.content.classList.add('hidden')
 }
 
 function showMainView() {
-  el.introScreen.classList.add('hidden')
   el.topNav.classList.remove('hidden')
   el.statusStrip.classList.remove('hidden')
   el.content.classList.remove('hidden')
@@ -192,11 +156,11 @@ function renderPanels() {
   el.title.textContent = site.title
   el.subtitle.textContent = site.subtitle
 
-  el.panels.home.innerHTML = renderHome(site, schedule, assignments, changelog)
+  el.panels.home.innerHTML = renderHome(site, schedule, changelog)
+  el.panels.hangout.innerHTML = renderHangout(schedule)
   el.panels.location.innerHTML = renderLocation(site)
   el.panels.food.innerHTML = renderFood(food)
-  el.panels.schedule.innerHTML = renderSchedule(schedule)
-  el.panels.assignments.innerHTML = renderAssignments(assignments)
+  el.panels.schedule.innerHTML = renderSchedule(schedule, assignments)
 
   for (const [name, panel] of Object.entries(el.panels)) {
     panel.classList.toggle('hidden', name !== state.selectedTab)
@@ -211,27 +175,29 @@ function syncTabButtons() {
   }
 }
 
-function renderHome(site, schedule, assignments, changelog) {
+function renderHome(site, schedule, changelog) {
   const dateContext = getDateContext(site.dateRange)
-  const todayLabel = formatDate(new Date())
-  const dayTimeline = schedule.days.find((d) => d.date === state.selectedDay)?.timeline ?? []
-  const dayAssignments = assignments.entries.filter((entry) => entry.day === state.selectedDay)
+  const mapContent = navigator.onLine
+    ? '<div class="map-wrap"><iframe title="Location preview" loading="lazy" src="' +
+      escapeHtml(site.location.mapEmbedUrl) +
+      '"></iframe></div>'
+    : '<p class="muted">Map is hidden while offline. Reconnect to load location preview.</p>'
 
   return (
     '<section class="card">' +
-    '<h2>Today: ' + escapeHtml(todayLabel) + '</h2>' +
     renderCountdown(dateContext, site) +
-    '<div class="day-focus">' +
-    '<h2>' +
-    escapeHtml(formatDate(state.selectedDay)) +
-    '</h2>' +
-    '<p class="muted">Day-first view</p>' +
-    '</div>' +
-    '<div class="day-chips">' + renderDayChips(schedule.days) + '</div>' +
-    '<h3 style="margin-top:1rem;">Timeline</h3>' +
-    renderTimeline(dayTimeline) +
-    '<h3 style="margin-top:1rem;">Assignments</h3>' +
-    renderAssignmentList(dayAssignments, true) +
+    '<h3 style="margin-top: 0;">Location</h3>' +
+    '<p><strong>' +
+    escapeHtml(site.location.name) +
+    '</strong><br />' +
+    escapeHtml(site.location.addressLine1) +
+    '<br />' +
+    escapeHtml(site.location.addressLine2) +
+    '</p>' +
+    '<p><a class="btn" href="' +
+    escapeHtml(site.location.mapOpenUrl) +
+    '" target="_blank" rel="noreferrer">Open in Google Maps</a></p>' +
+    mapContent +
     '</section>'
   )
 }
@@ -281,36 +247,32 @@ function renderLocation(site) {
     '</p>' +
     '<p><a class="btn" href="' +
     escapeHtml(site.location.mapOpenUrl) +
-    '" target="_blank" rel="noreferrer">Open in OpenStreetMap</a></p>' +
+    '" target="_blank" rel="noreferrer">Open in Google Maps</a></p>' +
     mapContent +
     '</section>'
   )
 }
 
-function renderSchedule(schedule) {
+function renderSchedule(schedule, assignments) {
   const day = schedule.days.find((d) => d.date === state.selectedDay)
+  const dayEntries = assignments.entries.filter((entry) => entry.day === state.selectedDay)
+  const sharedTimeline = getSharedTimeline(schedule.days)
 
   return (
     '<section class="card">' +
     '<h2>Daily Schedule</h2>' +
     '<div class="day-chips">' + renderDayChips(schedule.days) + '</div>' +
     '<h3 style="margin-top: 1rem;">' + escapeHtml(day?.label ?? 'Day') + '</h3>' +
-    renderTimeline(day?.timeline ?? []) +
-    '<h3 style="margin-top: 1rem;">Hangout Ideas</h3>' +
-    renderList(schedule.hangoutIdeas) +
+    renderMergedAgenda(sharedTimeline, dayEntries) +
     '</section>'
   )
 }
 
-function renderAssignments(assignments) {
-  const dayEntries = assignments.entries.filter((entry) => entry.day === state.selectedDay)
-
+function renderHangout(schedule) {
   return (
     '<section class="card">' +
-    '<h2>Assignments</h2>' +
-    '<p class="muted">Types: breakfast prep, meal prep, salad, cleanup crew, activity lead. Missing details are marked as TBD.</p>' +
-    '<div class="day-chips">' + renderDayChips(assignments.days) + '</div>' +
-    '<div style="margin-top:1rem;">' + renderAssignmentList(dayEntries, false) + '</div>' +
+    '<h2>Hangout Ideas</h2>' +
+    renderList(schedule.hangoutIdeas) +
     '</section>'
   )
 }
@@ -333,6 +295,123 @@ function renderCountdown(dateContext, site) {
     '. Use the day links below to preview each day.' +
     '</div>'
   )
+}
+
+function getSharedTimeline(days) {
+  if (!days.length) {
+    return []
+  }
+
+  const [firstDay, ...rest] = days
+  const firstTimeline = JSON.stringify(firstDay.timeline ?? [])
+  const allMatch = rest.every((day) => JSON.stringify(day.timeline ?? []) === firstTimeline)
+
+  return allMatch ? firstDay.timeline ?? [] : firstDay.timeline ?? []
+}
+
+function renderMergedAgenda(timelineItems, assignmentEntries) {
+  const events = timelineItems.map((item) => ({
+    kind: 'event',
+    time: item.time || 'TBD',
+    title: item.title || 'TBD',
+    note: item.note || '',
+  }))
+
+  const assignments = assignmentEntries.map((entry) => ({
+    kind: 'assignment',
+    time: assignmentTime(entry),
+    type: entry.type || 'TBD',
+    assignee: entry.assignee || 'TBD',
+    note: entry.note || '',
+  }))
+
+  const agenda = [...events, ...assignments].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time))
+
+  if (!agenda.length) {
+    return '<p class="muted">No schedule or assignments yet.</p>'
+  }
+
+  return (
+    '<ul class="timeline">' +
+    agenda
+      .map((item) => {
+        if (item.kind === 'event') {
+          const note = item.note ? '<div class="muted">' + escapeHtml(item.note) + '</div>' : ''
+          return (
+            '<li>' +
+            '<div class="timeline-time">' + escapeHtml(item.time) + '</div>' +
+            '<div>' + escapeHtml(item.title) + maybeTbd(item.title) + '</div>' +
+            note +
+            '</li>'
+          )
+        }
+
+        const note = item.note ? '<div class="muted">' + escapeHtml(item.note) + '</div>' : ''
+        return (
+          '<li>' +
+          '<div class="timeline-time">' + escapeHtml(item.time) + '</div>' +
+          '<div><strong>Assignment:</strong> ' + escapeHtml(item.type) + maybeTbd(item.type) + '</div>' +
+          '<div>Assigned: ' + escapeHtml(item.assignee) + maybeTbd(item.assignee) + '</div>' +
+          note +
+          '</li>'
+        )
+      })
+      .join('') +
+    '</ul>'
+  )
+}
+
+function assignmentTime(entry) {
+  const type = (entry.type || '').toLowerCase()
+
+  if (entry.time) {
+    return entry.time
+  }
+
+  if (type.includes('salad')) {
+    return '11:00 AM'
+  }
+
+  if (type.includes('cleanup')) {
+    return '6:30 PM'
+  }
+
+  if (type.includes('activity')) {
+    return '2:00 PM'
+  }
+
+  if (type.includes('breakfast') || type.includes('brunch')) {
+    return '9:30 AM'
+  }
+
+  if (type.includes('meal') || type.includes('supper')) {
+    return '5:30 PM'
+  }
+
+  return 'TBD'
+}
+
+function timeToMinutes(timeValue) {
+  const raw = (timeValue || '').trim().toUpperCase()
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/)
+
+  if (!match) {
+    return Number.MAX_SAFE_INTEGER
+  }
+
+  let hour = Number(match[1])
+  const minute = Number(match[2] || 0)
+  const period = match[3]
+
+  if (hour === 12) {
+    hour = 0
+  }
+
+  if (period === 'PM') {
+    hour += 12
+  }
+
+  return hour * 60 + minute
 }
 
 function renderTimeline(items) {

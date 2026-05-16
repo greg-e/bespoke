@@ -1,6 +1,6 @@
 {
-  "title": "June Gathering 2026",
-  "subtitle": "A simple family hub for plans, food, and assignments",
+  "title": "Gather '26",
+  "subtitle": "",
   "dateRange": {
     "start": "2026-06-22",
     "end": "2026-06-26"
@@ -9,7 +9,7 @@
     "name": "Lake House",
     "addressLine1": "64 Deerpath",
     "addressLine2": "Tracy, MN 56175",
-    "mapOpenUrl": "https://www.openstreetmap.org/?mlat=44.1390981&mlon=-95.679567#map=17/44.1390981/-95.679567",
-    "mapEmbedUrl": "https://www.openstreetmap.org/export/embed.html?bbox=-95.689567%2C44.1290981%2C-95.669567%2C44.1490981&layer=mapnik&marker=44.1390981%2C-95.679567"
+    "mapOpenUrl": "https://www.google.com/maps/search/?api=1&query=64+Deerpath,+Tracy,+MN+56175",
+    "mapEmbedUrl": "https://www.google.com/maps?q=64+Deerpath,+Tracy,+MN+56175&output=embed"
   }
 }
