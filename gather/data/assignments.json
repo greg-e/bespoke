@@ -1,0 +1,206 @@
+{
+  "days": [
+    {
+      "date": "2026-06-22",
+      "label": "Monday Jun 22",
+      "shortLabel": "Mon 22"
+    },
+    {
+      "date": "2026-06-23",
+      "label": "Tuesday Jun 23",
+      "shortLabel": "Tue 23"
+    },
+    {
+      "date": "2026-06-24",
+      "label": "Wednesday Jun 24",
+      "shortLabel": "Wed 24"
+    },
+    {
+      "date": "2026-06-25",
+      "label": "Thursday Jun 25",
+      "shortLabel": "Thu 25"
+    },
+    {
+      "date": "2026-06-26",
+      "label": "Friday Jun 26",
+      "shortLabel": "Fri 26"
+    }
+  ],
+  "entries": [
+    {
+      "id": "a1",
+      "day": "2026-06-22",
+      "type": "Breakfast prep",
+      "assignee": "TBD",
+      "note": "Brunch prep assignment"
+    },
+    {
+      "id": "a2",
+      "day": "2026-06-22",
+      "type": "Meal prep",
+      "assignee": "Tjernagel family",
+      "note": "Supper assignment"
+    },
+    {
+      "id": "a3",
+      "day": "2026-06-22",
+      "type": "Salad",
+      "assignee": "Jundanian family",
+      "note": "Lunch salad assignment"
+    },
+    {
+      "id": "a4",
+      "day": "2026-06-22",
+      "type": "Cleanup crew",
+      "assignee": "TBD",
+      "note": "Team cleanup posted in kitchen"
+    },
+    {
+      "id": "a5",
+      "day": "2026-06-22",
+      "type": "Activity lead",
+      "assignee": "TBD",
+      "note": "2:00 PM group activity"
+    },
+    {
+      "id": "a6",
+      "day": "2026-06-23",
+      "type": "Breakfast prep",
+      "assignee": "Tim Tjernagel, Rich",
+      "note": "Brunch prep assignment"
+    },
+    {
+      "id": "a7",
+      "day": "2026-06-23",
+      "type": "Meal prep",
+      "assignee": "Dieleman family",
+      "note": "Supper assignment"
+    },
+    {
+      "id": "a8",
+      "day": "2026-06-23",
+      "type": "Salad",
+      "assignee": "Tjernagel family",
+      "note": "Lunch salad assignment"
+    },
+    {
+      "id": "a9",
+      "day": "2026-06-23",
+      "type": "Cleanup crew",
+      "assignee": "TBD",
+      "note": "Team cleanup posted in kitchen"
+    },
+    {
+      "id": "a10",
+      "day": "2026-06-23",
+      "type": "Activity lead",
+      "assignee": "TBD",
+      "note": "2:00 PM group activity"
+    },
+    {
+      "id": "a11",
+      "day": "2026-06-24",
+      "type": "Breakfast prep",
+      "assignee": "Malik, Nana, Tim Tjernagel",
+      "note": "Brunch prep assignment"
+    },
+    {
+      "id": "a12",
+      "day": "2026-06-24",
+      "type": "Meal prep",
+      "assignee": "Ehrenberg family and Nana",
+      "note": "Supper assignment"
+    },
+    {
+      "id": "a13",
+      "day": "2026-06-24",
+      "type": "Salad",
+      "assignee": "Ehrenberg family",
+      "note": "Lunch salad assignment"
+    },
+    {
+      "id": "a14",
+      "day": "2026-06-24",
+      "type": "Cleanup crew",
+      "assignee": "TBD",
+      "note": "Team cleanup posted in kitchen"
+    },
+    {
+      "id": "a15",
+      "day": "2026-06-24",
+      "type": "Activity lead",
+      "assignee": "TBD",
+      "note": "2:00 PM group activity"
+    },
+    {
+      "id": "a16",
+      "day": "2026-06-25",
+      "type": "Breakfast prep",
+      "assignee": "Greg, Nana, Frank",
+      "note": "Brunch prep assignment"
+    },
+    {
+      "id": "a17",
+      "day": "2026-06-25",
+      "type": "Meal prep",
+      "assignee": "Jundanian family",
+      "note": "Supper assignment"
+    },
+    {
+      "id": "a18",
+      "day": "2026-06-25",
+      "type": "Salad",
+      "assignee": "Dieleman family",
+      "note": "Lunch salad assignment"
+    },
+    {
+      "id": "a19",
+      "day": "2026-06-25",
+      "type": "Cleanup crew",
+      "assignee": "TBD",
+      "note": "Team cleanup posted in kitchen"
+    },
+    {
+      "id": "a20",
+      "day": "2026-06-25",
+      "type": "Activity lead",
+      "assignee": "TBD",
+      "note": "2:00 PM group activity"
+    },
+    {
+      "id": "a21",
+      "day": "2026-06-26",
+      "type": "Breakfast prep",
+      "assignee": "Nathaniel, Tim-Tim, Ben",
+      "note": "Brunch prep assignment"
+    },
+    {
+      "id": "a22",
+      "day": "2026-06-26",
+      "type": "Meal prep",
+      "assignee": "Refrigerator buffet then pizza",
+      "note": "Supper assignment"
+    },
+    {
+      "id": "a23",
+      "day": "2026-06-26",
+      "type": "Salad",
+      "assignee": "Jundanian family",
+      "note": "Lunch salad assignment"
+    },
+    {
+      "id": "a24",
+      "day": "2026-06-26",
+      "type": "Cleanup crew",
+      "assignee": "TBD",
+      "note": "Team cleanup posted in kitchen"
+    },
+    {
+      "id": "a25",
+      "day": "2026-06-26",
+      "type": "Activity lead",
+      "assignee": "TBD",
+      "note": "2:00 PM group activity"
+    }
+  ]
+}

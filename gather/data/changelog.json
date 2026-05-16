@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "date": "2026-05-16",
+      "title": "Initial app scaffolded",
+      "details": "Imported starting plans from the archived food and schedule notes into structured JSON."
+    },
+    {
+      "date": "2026-05-16",
+      "title": "Assignments initialized",
+      "details": "Set up meal prep, salad, cleanup crew, and activity lead assignments with TBD placeholders where details are pending."
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "hangoutIdeas": [
+    "Ride the jet ski",
+    "Swim",
+    "Canoeing",
+    "Board games",
+    "Hot tub",
+    "Fishing",
+    "Hammock time"
+  ],
+  "days": [
+    {
+      "date": "2026-06-22",
+      "label": "Monday Jun 22",
+      "shortLabel": "Mon 22",
+      "timeline": [
+        {
+          "time": "9:30 AM",
+          "title": "Brunch"
+        },
+        {
+          "time": "2:00 PM",
+          "title": "Group activity"
+        },
+        {
+          "time": "5:30 PM",
+          "title": "Supper"
+        },
+        {
+          "time": "8:15 PM",
+          "title": "Devo time"
+        },
+        {
+          "time": "9:30 PM",
+          "title": "Hang out, games, or bed"
+        }
+      ]
+    },
+    {
+      "date": "2026-06-23",
+      "label": "Tuesday Jun 23",
+      "shortLabel": "Tue 23",
+      "timeline": [
+        {
+          "time": "9:30 AM",
+          "title": "Brunch"
+        },
+        {
+          "time": "2:00 PM",
+          "title": "Group activity"
+        },
+        {
+          "time": "5:30 PM",
+          "title": "Supper"
+        },
+        {
+          "time": "8:15 PM",
+          "title": "Devo time"
+        },
+        {
+          "time": "9:30 PM",
+          "title": "Hang out, games, or bed"
+        }
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "label": "Wednesday Jun 24",
+      "shortLabel": "Wed 24",
+      "timeline": [
+        {
+          "time": "9:30 AM",
+          "title": "Brunch"
+        },
+        {
+          "time": "2:00 PM",
+          "title": "Group activity"
+        },
+        {
+          "time": "5:30 PM",
+          "title": "Supper"
+        },
+        {
+          "time": "8:15 PM",
+          "title": "Devo time"
+        },
+        {
+          "time": "9:30 PM",
+          "title": "Hang out, games, or bed"
+        }
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "label": "Thursday Jun 25",
+      "shortLabel": "Thu 25",
+      "timeline": [
+        {
+          "time": "9:30 AM",
+          "title": "Brunch"
+        },
+        {
+          "time": "2:00 PM",
+          "title": "Group activity"
+        },
+        {
+          "time": "5:30 PM",
+          "title": "Supper"
+        },
+        {
+          "time": "8:15 PM",
+          "title": "Devo time"
+        },
+        {
+          "time": "9:30 PM",
+          "title": "Hang out, games, or bed"
+        }
+      ]
+    },
+    {
+      "date": "2026-06-26",
+      "label": "Friday Jun 26",
+      "shortLabel": "Fri 26",
+      "timeline": [
+        {
+          "time": "9:30 AM",
+          "title": "Brunch"
+        },
+        {
+          "time": "2:00 PM",
+          "title": "Group activity"
+        },
+        {
+          "time": "5:30 PM",
+          "title": "Supper"
+        },
+        {
+          "time": "8:15 PM",
+          "title": "Devo time"
+        },
+        {
+          "time": "9:30 PM",
+          "title": "Hang out, games, or bed"
+        }
+      ]
+    }
+  ]
+}

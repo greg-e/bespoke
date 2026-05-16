@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>June Gathering 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topo-bg" aria-hidden="true"></div>
+    <main class="app-shell">
+      <header class="app-header">
+        <p class="eyebrow">Family Reunion Planner</p>
+        <h1 id="app-title">June Gathering 2026</h1>
+        <p id="app-subtitle" class="subtitle"></p>
+      </header>
+
+      <section id="intro-screen" class="intro-screen hidden" aria-label="Welcome">
+        <div class="card intro-card">
+          <h2>Welcome To The Reunion Hub</h2>
+          <p class="muted">Location is shown once here before you jump into the day-first planner.</p>
+          <p><strong id="intro-location-name"></strong><br /><span id="intro-location-line1"></span><br /><span id="intro-location-line2"></span></p>
+          <p>
+            <a id="intro-map-link" class="btn" href="#" target="_blank" rel="noreferrer">Open in OpenStreetMap</a>
+            <button id="enter-app" class="btn" type="button">Enter Day View</button>
+          </p>
+        </div>
+      </section>
+
+      <nav id="top-nav" class="tabs hidden" aria-label="Primary">
+        <button class="tab is-active" data-tab="home" type="button">Home</button>
+        <button class="tab" data-tab="location" type="button">Location</button>
+        <button class="tab" data-tab="food" type="button">Food</button>
+        <button class="tab" data-tab="schedule" type="button">Schedule</button>
+        <button class="tab" data-tab="assignments" type="button">Assignments</button>
+      </nav>
+
+      <section id="status-strip" class="status-strip" aria-live="polite"></section>
+
+      <section id="skeleton" class="skeleton-grid" aria-label="Loading content">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </section>
+
+      <section id="content" class="content hidden">
+        <article id="panel-home" class="panel"></article>
+        <article id="panel-location" class="panel hidden"></article>
+        <article id="panel-food" class="panel hidden"></article>
+        <article id="panel-schedule" class="panel hidden"></article>
+        <article id="panel-assignments" class="panel hidden"></article>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

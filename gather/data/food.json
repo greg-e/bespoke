@@ -1,0 +1,84 @@
+{
+  "summary": "Brunch at 9:30, flexible lunch, family supper rotation, and team cleanup after each meal.",
+  "shoppingDocUrl": "https://docs.google.com/document/d/1u1vNgTx5i4pAgnXYzso0IJWCvlSg3Rbq9Dh0G4m6aLs/edit?usp=sharing",
+  "brunchVolunteers": [
+    {
+      "day": "Tuesday",
+      "assignees": ["Tim Tjernagel", "Rich"]
+    },
+    {
+      "day": "Wednesday",
+      "assignees": ["Malik", "Nana", "Tim Tjernagel"]
+    },
+    {
+      "day": "Thursday",
+      "assignees": ["Greg", "Nana", "Frank"]
+    },
+    {
+      "day": "Friday",
+      "assignees": ["Nathaniel", "Tim-Tim", "Ben"]
+    }
+  ],
+  "saladAssignments": [
+    {
+      "day": "Monday",
+      "assignee": "Jundanian family"
+    },
+    {
+      "day": "Tuesday",
+      "assignee": "Tjernagel family"
+    },
+    {
+      "day": "Wednesday",
+      "assignee": "Ehrenberg family"
+    },
+    {
+      "day": "Thursday",
+      "assignee": "Dieleman family"
+    },
+    {
+      "day": "Friday",
+      "assignee": "Jundanian family"
+    }
+  ],
+  "supperAssignments": [
+    {
+      "day": "Monday",
+      "assignee": "Tjernagel family"
+    },
+    {
+      "day": "Tuesday",
+      "assignee": "Dieleman family"
+    },
+    {
+      "day": "Wednesday",
+      "assignee": "Ehrenberg family and Nana"
+    },
+    {
+      "day": "Thursday",
+      "assignee": "Jundanian family"
+    },
+    {
+      "day": "Friday",
+      "assignee": "Refrigerator buffet, then pizza if needed"
+    }
+  ],
+  "allergies": [
+    "Gluten free needs",
+    "Soy limit, except in chocolate and sauces",
+    "Low dairy preference",
+    "Provide meat-free, protein-rich sides",
+    "No peanuts, and caution around Ben"
+  ],
+  "kitchenNotes": [
+    "Kitchen has standard pots, pans, utensils, and Blackstone grill",
+    "Bring complete ingredient list for each supper assignment",
+    "Include quantities, weights, and preferred brand when needed"
+  ],
+  "extraRequests": [
+    "Snacks and lunch foods",
+    "Drinks",
+    "Salad ingredients",
+    "Extras like skewer sticks or foil"
+  ]
+}
