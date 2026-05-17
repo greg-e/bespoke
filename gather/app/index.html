@@ -26,12 +26,13 @@
         </a>
       </header>
 
-      <section id="status-strip" class="status-strip" aria-live="polite"></section>
+      <!-- <section id="status-strip" class="status-strip" aria-live="polite"></section> -->
 
       <nav class="nav-tabs">
         <button class="nav-tab is-active" data-view="schedule">Schedule</button>
         <button class="nav-tab" data-view="assignments">Assignments</button>
         <button class="nav-tab" data-view="food">Food</button>
+        <button class="nav-tab" data-view="system">System</button>
       </nav>
 
       <section id="skeleton" class="skeleton-accordion" aria-label="Loading content">
@@ -60,9 +61,15 @@
         <div id="view-food" class="view hidden">
           <div id="food-content"></div>
         </div>
+
+        <!-- System View -->
+        <div id="view-system" class="view hidden">
+          <div id="system-content"></div>
+        </div>
       </section>
 
       <footer class="app-footer">
+        <div id="footer-status" class="footer-status"></div>
         <a id="whatsapp-link-footer" class="whatsapp-link whatsapp-footer" href="#" target="_blank" title="WhatsApp">
           <img src="./assets/whatsapp-glyph-green.svg" alt="WhatsApp" width="40" height="40" style="display: block;"/>
         </a>
