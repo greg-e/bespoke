@@ -194,6 +194,41 @@
       "type": "Activity lead",
       "assignee": "TBD",
       "note": "2:00 PM group activity"
+    },
+    {
+      "id": "a26",
+      "day": "2026-06-22",
+      "type": "Devo",
+      "assignee": "TBD",
+      "note": "8:15 PM devo time"
+    },
+    {
+      "id": "a27",
+      "day": "2026-06-23",
+      "type": "Devo",
+      "assignee": "TBD",
+      "note": "8:15 PM devo time"
+    },
+    {
+      "id": "a28",
+      "day": "2026-06-24",
+      "type": "Devo",
+      "assignee": "TBD",
+      "note": "8:15 PM devo time"
+    },
+    {
+      "id": "a29",
+      "day": "2026-06-25",
+      "type": "Devo",
+      "assignee": "TBD",
+      "note": "8:15 PM devo time"
+    },
+    {
+      "id": "a30",
+      "day": "2026-06-26",
+      "type": "Devo",
+      "assignee": "TBD",
+      "note": "8:15 PM devo time"
     }
   ]
 }

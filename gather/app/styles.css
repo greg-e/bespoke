@@ -43,7 +43,7 @@ ul li {
 
 .app-shell {
   width: min(1200px, 95vw);
-  margin: 1.5rem auto 3rem;
+  margin: 1.5rem auto 1.25rem;
 }
 
 .app-header {
@@ -64,6 +64,11 @@ h1 {
   color: var(--muted);
   font-size: 0.95rem;
   font-weight: 400;
+}
+
+.badge.draft {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .subtitle-area {
@@ -103,17 +108,17 @@ h1 {
 }
 
 .whatsapp-footer {
-  margin-top: 2rem;
-  padding: 1rem;
+  margin-top: 0;
+  padding: 0;
 }
 
 .app-footer {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 2rem;
+  margin-top: 0.75rem;
   border-top: 1px solid var(--line);
-  padding-top: 1.5rem;
+  padding-top: 0.5rem;
 }
 
 .nav-tabs {
@@ -202,6 +207,99 @@ h1 {
   font-size: 0.95rem;
 }
 
+.assignment-detail {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.assignment-detail--stacked {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.assignment-detail-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.assignment-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.inline-edit {
+  display: inline-block;
+  min-width: 2ch;
+  padding: 0 0.2rem;
+  border-radius: 0.35rem;
+  outline: none;
+  cursor: text;
+  transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+}
+
+.inline-edit:hover {
+  background: rgba(17, 24, 39, 0.04);
+}
+
+.inline-edit:focus {
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.22);
+}
+
+.inline-edit.is-placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.inline-title {
+  font-weight: 600;
+}
+
+.inline-time,
+.inline-note,
+.inline-assignee {
+  min-width: 4ch;
+}
+
+.activity-note .inline-edit.is-placeholder,
+.activity-time .inline-edit.is-placeholder {
+  opacity: 0.9;
+}
+
+.hangout-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.75rem;
+  background: rgba(37, 211, 102, 0.08);
+  border: 1px solid rgba(37, 211, 102, 0.18);
+}
+
+.hangout-prompt__icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.hangout-prompt__text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.hangout-prompt__text strong {
+  display: block;
+  font-weight: 700;
+}
+
 .accordion {
   display: grid;
   gap: 0;
@@ -267,6 +365,12 @@ h1 {
 
 .accordion-day.is-expanded .accordion-content {
   max-height: 3000px;
+}
+
+@media (max-width: 720px) {
+  .inline-edit {
+    padding: 0.1rem 0.25rem;
+  }
 }
 
 .accordion-body {
@@ -356,6 +460,15 @@ h1 {
 }
 
 @media (max-width: 860px) {
+  .app-shell {
+    margin: 1rem auto 0.5rem;
+  }
+
+  .app-footer {
+    margin-top: 0.5rem;
+    padding-top: 0.35rem;
+  }
+
   .grid-2,
   .grid-3 {
     grid-template-columns: 1fr;

@@ -6,6 +6,9 @@ const DATA_FILES = {
 }
 
 const STORAGE_PREFIX = 'gather-june-2026:'
+const DRAFT_STORAGE_KEY = STORAGE_PREFIX + 'drafts'
+
+const drafts = loadDrafts()
 
 const state = {
   data: {},
@@ -13,6 +16,7 @@ const state = {
   usedCacheFallback: false,
   currentView: 'schedule',
   searchQuery: '',
+  hasDraftEdits: Object.keys(drafts).length > 0,
 }
 
 const el = {
@@ -49,6 +53,7 @@ async function bootstrap() {
     }
   }
 
+  state.hasDraftEdits = Object.keys(drafts).length > 0
   el.skeleton.classList.add('hidden')
   bindNavHandlers()
   bindSearchHandler()
@@ -151,6 +156,10 @@ function renderStatusStrip() {
     parts.push('<span class="badge ok">Live data loaded</span>')
   }
 
+  if (state.hasDraftEdits) {
+    parts.push('<span class="badge draft">Draft edits saved in this browser</span>')
+  }
+
   el.statusStrip.innerHTML = parts.join('')
 }
 
@@ -189,35 +198,36 @@ function renderAccordion() {
     // Merged schedule + assignments
     if (day.timeline && day.timeline.length > 0) {
       html += '<ul class="day-schedule">'
-      for (const item of day.timeline) {
-        const hasTime = item.time && item.time.trim().length > 0
+      for (const [index, item] of day.timeline.entries()) {
+        const itemPath = 'schedule.days.' + day.date + '.timeline.' + index
+        const title = getEditableValue(itemPath + '.title', item.title || '')
+        const time = getEditableValue(itemPath + '.time', item.time || '')
+        const note = getEditableValue(itemPath + '.note', item.note || '')
+        const hasTime = time.trim().length > 0
         const liClass = hasTime ? '' : ' class="flexible"'
         
         html += '<li' + liClass + '>'
         html += '<div class="activity-header">'
-        html += '<strong>' + escapeHtml(item.title) + '</strong>'
+        html += '<strong>' + escapeHtml(title || 'Untitled item') + '</strong>'
         if (hasTime) {
-          html += ' <span class="activity-time">' + escapeHtml(item.time) + '</span>'
-        } else if (item.note) {
-          html += ' <span class="activity-note">' + escapeHtml(item.note) + '</span>'
+          html += ' <span class="activity-time">' + escapeHtml(time) + '</span>'
+        } else {
+          html += ' <span class="activity-note">' + renderEditableText(itemPath + '.note', note, 'Add note', 'inline-note') + '</span>'
         }
         html += '</div>'
+
+        if (title && (title.toLowerCase().includes('hangout') || title.toLowerCase().includes('free time'))) {
+          html += renderHangoutPrompt()
+        }
         
         // Find related assignments (for timed activities and specific named activities like Lunch)
-        const isSpecialActivity = item.title && (item.title.toLowerCase().includes('lunch') || item.title.toLowerCase().includes('hangout'))
-        const relatedAssignments = (hasTime || isSpecialActivity) ? findAssignmentsForActivity(item.title, dayAssignments) : []
+        const isSpecialActivity = title && (title.toLowerCase().includes('lunch') || title.toLowerCase().includes('hangout'))
+        const relatedAssignments = (hasTime || isSpecialActivity) ? findAssignmentsForActivity(title, dayAssignments) : []
         
         if (relatedAssignments.length > 0) {
           for (const assignment of relatedAssignments) {
             html += '<div class="assignment-inline">'
-            const isLunch = item.title && item.title.toLowerCase().includes('lunch')
-            if (isLunch) {
-              // For Lunch: show "assignee - type" format
-              html += escapeHtml(assignment.assignee) + ' - ' + escapeHtml(assignment.type)
-            } else {
-              // For all others: just show assignee
-              html += escapeHtml(assignment.assignee)
-            }
+            html += renderAssignmentDetails(assignment, title)
             html += '</div>'
           }
         }
@@ -236,6 +246,7 @@ function renderAccordion() {
 
   el.accordionRoot.innerHTML = html
   bindAccordionHandlers()
+  bindEditableFields()
 }
 
 function findAssignmentsForActivity(activityTitle, dayAssignments) {
@@ -251,6 +262,8 @@ function findAssignmentsForActivity(activityTitle, dayAssignments) {
     } else if (title.includes('group activity') && type.includes('activity')) {
       matches.push(assignment)
     } else if (title.includes('supper') && type.includes('meal')) {
+      matches.push(assignment)
+    } else if (title.includes('supper') && type.includes('cleanup')) {
       matches.push(assignment)
     } else if (title.includes('lunch') && type.includes('salad')) {
       matches.push(assignment)
@@ -371,10 +384,12 @@ function renderAssignments() {
     item.innerHTML = `
       <div class="assignment-day">${escapeHtml(assignment.dayLabel)}</div>
       <div class="assignment-type">${escapeHtml(assignment.type)}</div>
-      <div class="assignment-person">${escapeHtml(assignment.assignee)}</div>
+      <div class="assignment-person">${renderAssignmentDetails(assignment, assignment.dayLabel)}</div>
     `
     el.assignmentsList.appendChild(item)
   }
+
+  bindEditableFields()
 }
 
 function renderFood() {
@@ -400,6 +415,175 @@ function renderFood() {
   html += '</div>'
 
   el.foodContent.innerHTML = html
+}
+
+function loadDrafts() {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return {}
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+
+    return parsed
+  } catch {
+    return {}
+  }
+}
+
+function saveDrafts() {
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts))
+  } catch {
+    // Ignore localStorage failures.
+  }
+
+  state.hasDraftEdits = Object.keys(drafts).length > 0
+}
+
+function getDraftValue(path) {
+  if (!Object.prototype.hasOwnProperty.call(drafts, path)) return null
+  return drafts[path]
+}
+
+function getEditableValue(path, fallback) {
+  const draftValue = getDraftValue(path)
+  if (draftValue === null) return fallback
+  return draftValue
+}
+
+function setDraftValue(path, value) {
+  const normalized = String(value ?? '').trim()
+
+  if (!normalized) {
+    delete drafts[path]
+  } else {
+    drafts[path] = normalized
+  }
+
+  saveDrafts()
+}
+
+function renderEditableText(path, value, placeholder, extraClass = '') {
+  const resolved = String(value ?? '').trim()
+  const isPlaceholder = resolved.length === 0
+  const text = isPlaceholder ? placeholder : resolved
+  const className = ['inline-edit', extraClass, isPlaceholder ? 'is-placeholder' : '']
+    .filter(Boolean)
+    .join(' ')
+
+  return '<span class="' + className + '" contenteditable="true" spellcheck="false" data-edit-path="' + escapeHtml(path) + '" data-placeholder="' + escapeHtml(placeholder) + '" data-original-text="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>'
+}
+
+function renderAssignmentDetails(assignment, contextTitle = '') {
+  const type = String(assignment.type || '').toLowerCase()
+  const title = String(contextTitle || '').toLowerCase()
+  const assigneePath = 'assignments.entries.' + assignment.id + '.assignee'
+  const assigneeValue = getEditableValue(assigneePath, assignment.assignee === 'TBD' ? '' : assignment.assignee)
+
+  if (type.includes('cleanup')) {
+    return '<div class="assignment-detail assignment-detail--single"><span class="assignment-label">Cleanup Crew</span>' + renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee') + '</div>'
+  }
+
+  if (type.includes('activity')) {
+    const activityTitlePath = 'assignments.entries.' + assignment.id + '.activity_title'
+    const activityTitleValue = getEditableValue(activityTitlePath, '')
+
+    return [
+      '<div class="assignment-detail assignment-detail--stacked">',
+      '<div class="assignment-detail-row">',
+      '<span class="assignment-label">Activity title</span>',
+      renderEditableText(activityTitlePath, activityTitleValue, 'Add activity title', 'inline-assignment-title'),
+      '</div>',
+      '<div class="assignment-detail-row">',
+      '<span class="assignment-label">Lead</span>',
+      renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee'),
+      '</div>',
+      '</div>',
+    ].join('')
+  }
+
+  if (title.includes('lunch')) {
+    return renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee') + ' - ' + escapeHtml(assignment.type)
+  }
+
+  return renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee')
+}
+
+function renderHangoutPrompt() {
+  const whatsappIcon = '../WhatsApp-Brand-Resource-Center/WhatsApp-Brand-Resouce-Center_2026/01_Glyph/01_Digital RGB/03_SVG/Digital_Glyph_Green_RGB_2026.svg'
+
+  return [
+    '<div class="hangout-prompt">',
+    '<img class="hangout-prompt__icon" src="' + whatsappIcon + '" alt="WhatsApp" width="24" height="24" />',
+    '<p class="hangout-prompt__text"><strong>Share pictures!</strong> Tell us what you\'re doing!</p>',
+    '</div>',
+  ].join('')
+}
+
+function bindEditableFields() {
+  const fields = document.querySelectorAll('.inline-edit')
+
+  for (const field of fields) {
+    if (field.dataset.bound === 'true') continue
+
+    field.dataset.bound = 'true'
+    field.addEventListener('focus', handleEditableFocus)
+    field.addEventListener('blur', handleEditableBlur)
+    field.addEventListener('keydown', handleEditableKeydown)
+  }
+}
+
+function handleEditableFocus(event) {
+  const field = event.currentTarget
+
+  if (field.classList.contains('is-placeholder')) {
+    field.textContent = ''
+    field.classList.remove('is-placeholder')
+  }
+
+  field.dataset.originalText = field.textContent || ''
+  field.dataset.editCanceled = 'false'
+}
+
+function handleEditableKeydown(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    event.currentTarget.blur()
+    return
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    const field = event.currentTarget
+    field.dataset.editCanceled = 'true'
+    field.textContent = field.dataset.originalText || field.dataset.placeholder || ''
+    field.blur()
+  }
+}
+
+function handleEditableBlur(event) {
+  const field = event.currentTarget
+
+  if (field.dataset.editCanceled === 'true') {
+    field.dataset.editCanceled = 'false'
+    return
+  }
+
+  const path = field.dataset.editPath
+  const placeholder = field.dataset.placeholder || 'Add value'
+  const nextValue = (field.textContent || '').trim()
+
+  if (!nextValue) {
+    field.classList.add('is-placeholder')
+    field.textContent = placeholder
+  } else {
+    field.classList.remove('is-placeholder')
+    field.textContent = nextValue
+  }
+
+  setDraftValue(path, nextValue)
+  render()
 }
 
 document.addEventListener('DOMContentLoaded', () => {

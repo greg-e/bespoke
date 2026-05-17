@@ -183,6 +183,20 @@
           "title": "Hang out, games, or bed"
         }
       ]
+    },
+    {
+      "date": "2026-06-27",
+      "label": "Saturday Jun 27 - Departure Day",
+      "shortLabel": "Sat 27",
+      "timeline": [
+        {
+          "title": "Breakfast items available"
+        },
+        {
+          "title": "Sandwich supplies available",
+          "note": "Make food for your trip or eat before you go"
+        }
+      ]
     }
   ]
 }
