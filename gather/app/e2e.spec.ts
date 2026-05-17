@@ -1,0 +1,97 @@
+import { test, expect } from '@playwright/test';
+
+const APP_URL = 'https://gather.ehrenberg.us/app/';
+
+// Utility: Wait for main content to load
+async function waitForContent(page: any) {
+  await page.waitForSelector('#content:not(.hidden)', { timeout: 15000 });
+}
+
+test.describe('Gather App – Public (signed-out) state', () => {
+  test('main content loads from Supabase', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    // Accordion has at least one day loaded from Supabase
+    const firstDay = page.locator('.accordion-day').first();
+    await expect(firstDay).toBeVisible();
+  });
+
+  test('System tab is hidden', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    const systemTab = page.locator('.nav-tab[data-view="system"]');
+    await expect(systemTab).toBeHidden();
+  });
+
+  test('footer shows Live data loaded, Read-only mode, Sign in to edit', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    const footer = page.locator('#footer-status');
+    await expect(footer).toContainText('Live data loaded');
+    await expect(footer).toContainText('Read-only mode');
+    await expect(footer).toContainText('Sign in to edit');
+  });
+
+  test('all editable fields are read-only', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    // Expand first accordion day
+    await page.locator('.accordion-header').first().click();
+    const editables = page.locator('.inline-edit');
+    const count = await editables.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      await expect(editables.nth(i)).toHaveAttribute('contenteditable', 'false');
+    }
+  });
+
+  test('empty assignees show TBD when signed out', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    // Expand all accordion days to reveal assignments
+    const headers = page.locator('.accordion-header');
+    const headerCount = await headers.count();
+    for (let i = 0; i < headerCount; i++) {
+      await headers.nth(i).click();
+    }
+    // Only check assignee-specific placeholders (not activity title etc.)
+    const assigneePlaceholders = page.locator('.inline-assignee.is-placeholder');
+    const count = await assigneePlaceholders.count();
+    for (let i = 0; i < count; i++) {
+      await expect(assigneePlaceholders.nth(i)).toHaveText('TBD');
+    }
+  });
+
+  test('WhatsApp link in hangout prompt is clickable', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    // Expand days to find a hangout prompt
+    const headers = page.locator('.accordion-header');
+    const headerCount = await headers.count();
+    for (let i = 0; i < headerCount; i++) {
+      await headers.nth(i).click();
+    }
+    const hangoutLink = page.locator('.hangout-prompt__link').first();
+    if (await hangoutLink.count() > 0) {
+      await expect(hangoutLink).toHaveAttribute('href', /chat.whatsapp.com/);
+      await expect(hangoutLink).toHaveAttribute('target', '_blank');
+    }
+  });
+
+  test('nav tabs Schedule, Assignments, Food all switch views', async ({ page }) => {
+    await page.goto(APP_URL);
+    await waitForContent(page);
+    for (const view of ['assignments', 'food', 'schedule']) {
+      const tab = page.locator(`.nav-tab[data-view="${view}"]`);
+      await tab.click();
+      // The clicked tab should become active
+      await expect(tab).toHaveClass(/is-active/);
+      // The corresponding view should not have the hidden class
+      await expect(page.locator(`#view-${view}`)).not.toHaveClass(/hidden/);
+    }
+  });
+});
+
+// Note: Sign-in flow tests require a live email inbox to receive the Supabase magic link.
+// To automate: integrate a service like Mailosaur or Ethereal to intercept emails and
+// extract the magic link programmatically, then navigate to it in Playwright.

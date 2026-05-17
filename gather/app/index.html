@@ -28,11 +28,19 @@
 
       <!-- <section id="status-strip" class="status-strip" aria-live="polite"></section> -->
 
-      <nav class="nav-tabs">
-        <button class="nav-tab is-active" data-view="schedule">Schedule</button>
-        <button class="nav-tab" data-view="assignments">Assignments</button>
-        <button class="nav-tab" data-view="food">Food</button>
-        <button class="nav-tab" data-view="system">System</button>
+      <nav class="nav-tabs" id="nav-tabs">
+        <button class="nav-hamburger" id="nav-hamburger" type="button" aria-expanded="false" aria-controls="nav-tabs">
+          <span class="nav-hamburger__label" id="nav-active-label">Schedule</span>
+          <span class="nav-hamburger__icon" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+        </button>
+        <div class="nav-tab-list" id="nav-tab-list">
+          <button class="nav-tab is-active" data-view="schedule">Schedule</button>
+          <button class="nav-tab" data-view="assignments">Assignments</button>
+          <button class="nav-tab" data-view="food">Food</button>
+          <button class="nav-tab" data-view="system">System</button>
+        </div>
       </nav>
 
       <section id="skeleton" class="skeleton-accordion" aria-label="Loading content">

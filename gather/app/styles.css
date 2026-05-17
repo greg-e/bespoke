@@ -130,33 +130,106 @@ h1 {
 }
 
 .nav-tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--line);
+  position: relative;
   margin-bottom: 1.5rem;
-  flex-wrap: wrap;
+}
+
+.nav-hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  gap: 0.75rem;
+  transition: border-color 150ms ease;
+}
+
+.nav-hamburger:hover {
+  border-color: var(--text);
+}
+
+.nav-hamburger__label {
+  flex: 1;
+  text-align: left;
+}
+
+.nav-hamburger__icon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.nav-hamburger__icon span {
+  display: block;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.nav-tabs.is-open .nav-hamburger__icon span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.nav-tabs.is-open .nav-hamburger__icon span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-tabs.is-open .nav-hamburger__icon span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.nav-tab-list {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.nav-tabs.is-open .nav-tab-list {
+  display: flex;
 }
 
 .nav-tab {
-  padding: 0.75rem 1.2rem;
+  padding: 0.8rem 1rem;
   border: none;
   background: none;
   color: var(--muted);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  text-align: left;
+  border-left: 3px solid transparent;
   transition: all 150ms ease;
 }
 
 .nav-tab:hover {
   color: var(--text);
+  background: rgba(0,0,0,0.03);
 }
 
 .nav-tab.is-active {
   color: var(--text);
-  border-bottom-color: var(--text);
+  border-left-color: var(--text);
   font-weight: 600;
+  background: rgba(0,0,0,0.03);
 }
 
 .view {

@@ -31,6 +31,10 @@ const el = {
   content: document.getElementById('content'),
   accordionRoot: document.getElementById('accordion-root'),
   navTabs: document.querySelectorAll('.nav-tab'),
+  navHamburger: document.getElementById('nav-hamburger'),
+  navTabList: document.getElementById('nav-tab-list'),
+  navActiveLabel: document.getElementById('nav-active-label'),
+  navTabsContainer: document.getElementById('nav-tabs'),
   assignmentSearch: document.getElementById('assignment-search'),
   assignmentsList: document.getElementById('assignments-list'),
   foodContent: document.getElementById('food-content'),
@@ -86,9 +90,31 @@ function bindNavHandlers() {
   el.navTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       const view = tab.dataset.view
+      closeNavMenu()
       switchView(view)
     })
   })
+
+  if (el.navHamburger) {
+    el.navHamburger.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const isOpen = el.navTabsContainer.classList.toggle('is-open')
+      el.navHamburger.setAttribute('aria-expanded', String(isOpen))
+    })
+  }
+
+  document.addEventListener('click', (e) => {
+    if (el.navTabsContainer && !el.navTabsContainer.contains(e.target)) {
+      closeNavMenu()
+    }
+  })
+}
+
+function closeNavMenu() {
+  if (el.navTabsContainer) {
+    el.navTabsContainer.classList.remove('is-open')
+    if (el.navHamburger) el.navHamburger.setAttribute('aria-expanded', 'false')
+  }
 }
 
 function bindSearchHandler() {
@@ -109,6 +135,7 @@ function switchView(viewName) {
   el.navTabs.forEach((tab) => {
     if (tab.dataset.view === viewName) {
       tab.classList.add('is-active')
+      if (el.navActiveLabel) el.navActiveLabel.textContent = tab.textContent
     } else {
       tab.classList.remove('is-active')
     }
@@ -950,9 +977,10 @@ function renderAssignmentDetails(assignment, contextTitle = '') {
   const title = String(contextTitle || '').toLowerCase()
   const assigneePath = 'assignments.entries.' + assignment.id + '.assignee'
   const assigneeValue = getEditableValue(assigneePath, assignment.assignee === 'TBD' ? '' : assignment.assignee)
+  const assigneePlaceholder = canEdit() ? 'Add assignee' : 'TBD'
 
   if (type.includes('cleanup')) {
-    return '<div class="assignment-detail assignment-detail--single"><span class="assignment-label">Cleanup Crew</span>' + renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee') + '</div>'
+    return '<div class="assignment-detail assignment-detail--single"><span class="assignment-label">Cleanup Crew</span>' + renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee') + '</div>'
   }
 
   if (type.includes('activity')) {
@@ -963,32 +991,35 @@ function renderAssignmentDetails(assignment, contextTitle = '') {
       '<div class="assignment-detail assignment-detail--stacked">',
       '<div class="assignment-detail-row">',
       '<span class="assignment-label">Activity title</span>',
-      renderEditableText(activityTitlePath, activityTitleValue, 'Add activity title', 'inline-assignment-title'),
+      renderEditableText(activityTitlePath, activityTitleValue, canEdit() ? 'Add activity title' : 'TBD', 'inline-assignment-title'),
       '</div>',
       '<div class="assignment-detail-row">',
       '<span class="assignment-label">Lead</span>',
-      renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee'),
+      renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee'),
       '</div>',
       '</div>',
     ].join('')
   }
 
   if (title.includes('lunch')) {
-    return renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee') + ' - ' + escapeHtml(assignment.type)
+    return renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee') + ' - ' + escapeHtml(assignment.type)
   }
 
-  return renderEditableText(assigneePath, assigneeValue, 'Add assignee', 'inline-assignee')
+  return renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee')
 }
 
 function renderHangoutPrompt() {
-  const whatsappIcon = './assets/whatsapp-glyph-green.svg'
+  const whatsappIcon = './assets/whatsapp-glyph-green.svg';
+  const whatsappUrl = 'https://chat.whatsapp.com/GZYt43LWzdd8TcD591s10s?mode=gi_t';
 
   return [
     '<div class="hangout-prompt">',
+    '<a href="' + whatsappUrl + '" target="_blank" rel="noopener" class="hangout-prompt__link">',
     '<img class="hangout-prompt__icon" src="' + whatsappIcon + '" alt="WhatsApp" width="24" height="24" />',
-    '<p class="hangout-prompt__text"><strong>Share pictures!</strong> Tell us what you\'re doing!</p>',
+    '<span class="hangout-prompt__text"><strong>Share pictures!</strong> Tell us what you\'re doing!</span>',
+    '</a>',
     '</div>',
-  ].join('')
+  ].join('');
 }
 
 function bindEditableFields() {
