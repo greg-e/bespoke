@@ -17,33 +17,56 @@
     <main class="app-shell">
       <header class="app-header">
         <h1 id="app-title">Gather '26</h1>
-        <p id="app-subtitle" class="subtitle"></p>
+        <div class="subtitle-area">
+          <p id="app-subtitle" class="subtitle"></p>
+          <a id="map-link" class="map-link" href="#" target="_blank"></a>
+        </div>
+        <a id="whatsapp-link-header" class="whatsapp-link whatsapp-header" href="#" target="_blank" title="WhatsApp">
+          <img src="../WhatsApp-Brand-Resource-Center/WhatsApp-Brand-Resouce-Center_2026/01_Glyph/01_Digital RGB/03_SVG/Digital_Glyph_Green_RGB_2026.svg" alt="WhatsApp" width="28" height="28" style="display: block;"/>
+        </a>
       </header>
-
-      <nav id="top-nav" class="tabs hidden" aria-label="Primary">
-        <button class="tab is-active" data-tab="home" type="button">Home</button>
-        <button class="tab" data-tab="schedule" type="button">Schedule</button>
-        <button class="tab" data-tab="hangout" type="button">Hangout</button>
-        <button class="tab" data-tab="location" type="button">Location</button>
-        <button class="tab" data-tab="food" type="button">Food</button>
-      </nav>
 
       <section id="status-strip" class="status-strip" aria-live="polite"></section>
 
-      <section id="skeleton" class="skeleton-grid" aria-label="Loading content">
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
+      <nav class="nav-tabs">
+        <button class="nav-tab is-active" data-view="schedule">Schedule</button>
+        <button class="nav-tab" data-view="assignments">Assignments</button>
+        <button class="nav-tab" data-view="food">Food</button>
+      </nav>
+
+      <section id="skeleton" class="skeleton-accordion" aria-label="Loading content">
+        <div class="skeleton-day"></div>
+        <div class="skeleton-day"></div>
+        <div class="skeleton-day"></div>
+        <div class="skeleton-day"></div>
+        <div class="skeleton-day"></div>
       </section>
 
       <section id="content" class="content hidden">
-        <article id="panel-home" class="panel"></article>
-        <article id="panel-hangout" class="panel hidden"></article>
-        <article id="panel-location" class="panel hidden"></article>
-        <article id="panel-food" class="panel hidden"></article>
-        <article id="panel-schedule" class="panel hidden"></article>
+        <!-- Schedule View -->
+        <div id="view-schedule" class="view">
+          <div id="accordion-root" class="accordion"></div>
+        </div>
+
+        <!-- Assignments View -->
+        <div id="view-assignments" class="view hidden">
+          <div class="search-box">
+            <input type="text" id="assignment-search" placeholder="Search by name, assignment, or day..." />
+          </div>
+          <div id="assignments-list" class="assignments-list"></div>
+        </div>
+
+        <!-- Food View -->
+        <div id="view-food" class="view hidden">
+          <div id="food-content"></div>
+        </div>
       </section>
+
+      <footer class="app-footer">
+        <a id="whatsapp-link-footer" class="whatsapp-link whatsapp-footer" href="#" target="_blank" title="WhatsApp">
+          <img src="../WhatsApp-Brand-Resource-Center/WhatsApp-Brand-Resouce-Center_2026/01_Glyph/01_Digital RGB/03_SVG/Digital_Glyph_Green_RGB_2026.svg" alt="WhatsApp" width="40" height="40" style="display: block;"/>
+        </a>
+      </footer>
     </main>
 
     <script type="module" src="./app.js"></script>
