@@ -511,7 +511,7 @@ function renderAssignmentDetails(assignment, contextTitle = '') {
 }
 
 function renderHangoutPrompt() {
-  const whatsappIcon = '../WhatsApp-Brand-Resource-Center/WhatsApp-Brand-Resouce-Center_2026/01_Glyph/01_Digital RGB/03_SVG/Digital_Glyph_Green_RGB_2026.svg'
+  const whatsappIcon = './assets/whatsapp-glyph-green.svg'
 
   return [
     '<div class="hangout-prompt">',
