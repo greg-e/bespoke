@@ -28,13 +28,6 @@
   ],
   "entries": [
     {
-      "id": "a1",
-      "day": "2026-06-22",
-      "type": "Breakfast prep",
-      "assignee": "TBD",
-      "note": "Brunch prep assignment"
-    },
-    {
       "id": "a2",
       "day": "2026-06-22",
       "type": "Meal prep",
