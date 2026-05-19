@@ -23,13 +23,12 @@ test.describe('Gather App – Public (signed-out) state', () => {
     await expect(systemTab).toBeHidden();
   });
 
-  test('footer shows Live data loaded, Read-only mode, Sign in to edit', async ({ page }) => {
+  test('footer shows key icon sign-in button', async ({ page }) => {
     await page.goto(APP_URL);
     await waitForContent(page);
-    const footer = page.locator('#footer-status');
-    await expect(footer).toContainText('Live data loaded');
-    await expect(footer).toContainText('Read-only mode');
-    await expect(footer).toContainText('Sign in to edit');
+    const signInButton = page.locator('#footer-status button[data-auth-action="signin"]');
+    await expect(signInButton).toBeVisible();
+    await expect(signInButton).toHaveAttribute('aria-label', 'Sign in to edit');
   });
 
   test('all editable fields are read-only', async ({ page }) => {

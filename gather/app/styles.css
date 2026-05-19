@@ -534,6 +534,16 @@ h1 {
   background: #f5f5f5;
 }
 
+.auth-action-icon {
+  min-width: 2rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .badge {
   display: inline-block;
   padding: 0.25rem 0.6rem;

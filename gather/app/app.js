@@ -353,8 +353,6 @@ function renderFooterStatus() {
 
   if (!navigator.onLine) {
     parts.push('<span class="badge offline">Offline mode: showing last-loaded data</span>')
-  } else {
-    parts.push('<span class="badge ok">Live data loaded</span>')
   }
 
   if (canEdit()) {
@@ -362,8 +360,7 @@ function renderFooterStatus() {
     parts.push('<span class="badge ok">Edit mode: ' + emailLabel + '</span>')
     parts.push('<button class="auth-action" type="button" data-auth-action="signout">Sign out</button>')
   } else {
-    parts.push('<span class="badge">Read-only mode</span>')
-    parts.push('<button class="auth-action" type="button" data-auth-action="signin">Sign in to edit</button>')
+    parts.push('<button class="auth-action auth-action-icon" type="button" data-auth-action="signin" aria-label="Sign in to edit" title="Sign in to edit"><span aria-hidden="true">&#128273;</span></button>')
   }
 
   const footerStatus = document.getElementById('footer-status')
