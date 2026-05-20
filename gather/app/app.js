@@ -238,31 +238,34 @@ async function loadAssignments() {
 
 async function loadSchedule() {
   try {
-    const [{ data: days, error: daysError }, { data: items, error: itemsError }] = await Promise.all([
+    const [{ data: days, error: daysError }, { data: activities, error: activitiesError }] = await Promise.all([
       supabase
         .from('schedule_days')
         .select('id, day_date, label, short_label')
         .order('day_date', { ascending: true }),
       supabase
-        .from('schedule_items')
-        .select('id, schedule_day_id, item_order, time, title, note')
-        .order('item_order', { ascending: true }),
+        .from('activities')
+        .select('id, schedule_day_id, sequence, title, time, note, assignment_id, link, attachment_path')
+        .order('sequence', { ascending: true }),
     ])
 
     if (daysError) throw daysError
-    if (itemsError) throw itemsError
+    if (activitiesError) throw activitiesError
 
-    const itemsByDayId = new Map()
-    for (const item of items || []) {
-      if (!itemsByDayId.has(item.schedule_day_id)) {
-        itemsByDayId.set(item.schedule_day_id, [])
+    const activitiesByDayId = new Map()
+    for (const activity of activities || []) {
+      if (!activitiesByDayId.has(activity.schedule_day_id)) {
+        activitiesByDayId.set(activity.schedule_day_id, [])
       }
-      itemsByDayId.get(item.schedule_day_id).push({
-        id: item.id,
-        itemOrder: item.item_order,
-        time: item.time,
-        title: item.title,
-        note: item.note,
+      activitiesByDayId.get(activity.schedule_day_id).push({
+        id: activity.id,
+        sequence: activity.sequence,
+        title: activity.title,
+        time: activity.time,
+        note: activity.note,
+        assignmentId: activity.assignment_id,
+        link: activity.link,
+        attachmentPath: activity.attachment_path,
       })
     }
 
@@ -273,7 +276,7 @@ async function loadSchedule() {
           date: day.day_date,
           label: day.label,
           shortLabel: day.short_label,
-          timeline: itemsByDayId.get(day.id) || [],
+          activities: activitiesByDayId.get(day.id) || [],
         })),
       },
       source: 'network',
@@ -400,6 +403,7 @@ function renderAccordion() {
   for (const day of schedule.days) {
     const isExpanded = state.expandedDays.has(day.date)
     const dayAssignments = assignments.entries.filter((entry) => entry.day === day.date)
+    const dayActivities = getSortedActivities(day.activities)
 
     html += '<div class="accordion-day ' + (isExpanded ? 'is-expanded' : '') + '" data-date="' + escapeHtml(day.date) + '">'
     const dayLabelPath = 'schedule.days.' + day.date + '.label'
@@ -408,49 +412,21 @@ function renderAccordion() {
     html += '<div class="accordion-content">'
     html += '<div class="accordion-body">'
 
-    // Merged schedule + assignments
-    if (day.timeline && day.timeline.length > 0) {
-      html += '<ul class="day-schedule">'
-      for (const [index, item] of day.timeline.entries()) {
-        const itemPath = 'schedule.days.' + day.date + '.timeline.' + index
-        const title = getEditableValue(itemPath + '.title', item.title || '')
-        const time = getEditableValue(itemPath + '.time', item.time || '')
-        const note = getEditableValue(itemPath + '.note', item.note || '')
-        const hasTime = time.trim().length > 0
-        const liClass = hasTime ? '' : ' class="flexible"'
-        
-        html += '<li' + liClass + '>'
-        html += '<div class="activity-header">'
-        html += '<strong>' + renderEditableText(itemPath + '.title', title, 'Untitled item', 'inline-schedule-title') + '</strong>'
-        if (hasTime) {
-          html += ' <span class="activity-time">' + renderEditableText(itemPath + '.time', time, 'Add time', 'inline-schedule-time') + '</span>'
-        } else {
-          html += ' <span class="activity-note">' + renderEditableText(itemPath + '.note', note, 'Add note', 'inline-note') + '</span>'
-        }
-        html += '</div>'
+    html += '<div class="activities-section">'
+    html += '<div class="activities-section__header">Activities</div>'
 
-        if (title && (title.toLowerCase().includes('hangout') || title.toLowerCase().includes('free time'))) {
-          html += renderHangoutPrompt()
-        }
-        
-        // Find related assignments (for timed activities and specific named activities like Lunch)
-        const isSpecialActivity = title && (title.toLowerCase().includes('lunch') || title.toLowerCase().includes('hangout'))
-        const relatedAssignments = (hasTime || isSpecialActivity) ? findAssignmentsForActivity(title, dayAssignments) : []
-        
-        if (relatedAssignments.length > 0) {
-          for (const assignment of relatedAssignments) {
-            html += '<div class="assignment-inline">'
-            html += renderAssignmentDetails(assignment, title)
-            html += '</div>'
-          }
-        }
-        
-        html += '</li>'
+    if (dayActivities.length > 0) {
+      html += '<ul class="activities-list">'
+      for (const activity of dayActivities) {
+        html += renderActivityCard(day.date, dayActivities, dayAssignments, activity)
       }
       html += '</ul>'
     } else {
-      html += '<p class="muted">No schedule for this day.</p>'
+      html += '<p class="muted">No activities for this day yet.</p>'
     }
+
+    html += renderActivityCreateForm(day.date, dayActivities, dayAssignments)
+    html += '</div>'
 
     html += '</div>' // accordion-body
     html += '</div>' // accordion-content
@@ -460,6 +436,336 @@ function renderAccordion() {
   el.accordionRoot.innerHTML = html
   bindAccordionHandlers()
   bindEditableFields()
+  bindActivityControls()
+}
+
+function getSortedActivities(activities) {
+  return [...(activities || [])].sort((a, b) => a.sequence - b.sequence || String(a.id).localeCompare(String(b.id)))
+}
+
+function findActivityContextById(activityId) {
+  const days = state.data.schedule?.content?.days || []
+  for (const day of days) {
+    const activity = (day.activities || []).find((entry) => entry.id === activityId)
+    if (activity) {
+      return { day, activity }
+    }
+  }
+
+  return { day: null, activity: null }
+}
+
+function getAssignmentLabel(assignment) {
+  const type = String(assignment.type || '').trim()
+  const assignee = String(assignment.assignee || '').trim()
+  return [type, assignee].filter(Boolean).join(' - ') || 'Unassigned'
+}
+
+function buildSequenceOptions(dayActivities, currentActivityId = null) {
+  const referenceActivities = currentActivityId
+    ? dayActivities.filter((activity) => activity.id !== currentActivityId)
+    : [...dayActivities]
+  const slotCount = referenceActivities.length + 1
+  const options = []
+
+  for (let position = 1; position <= slotCount; position += 1) {
+    const before = position > 1 ? referenceActivities[position - 2] : null
+    const after = position <= referenceActivities.length ? referenceActivities[position - 1] : null
+    let label = 'At the end'
+
+    if (!before && after) {
+      label = 'Before ' + (after.title || 'Untitled activity')
+    } else if (before && !after) {
+      label = 'After ' + (before.title || 'Untitled activity')
+    } else if (before && after) {
+      label = 'Between ' + (before.title || 'Untitled activity') + ' and ' + (after.title || 'Untitled activity')
+    } else if (!before && !after) {
+      label = 'At the top'
+    }
+
+    options.push({ value: String(position), label })
+  }
+
+  return options
+}
+
+function renderSelectOptions(options, selectedValue) {
+  return options.map((option) => {
+    const isSelected = String(option.value) === String(selectedValue)
+    return '<option value="' + escapeHtml(option.value) + '"' + (isSelected ? ' selected' : '') + '>' + escapeHtml(option.label) + '</option>'
+  }).join('')
+}
+
+function renderAssignmentSelect(activity, dayAssignments) {
+  const options = [
+    { value: '', label: 'No assignment' },
+    ...dayAssignments.map((assignment) => ({
+      value: assignment.id,
+      label: getAssignmentLabel(assignment),
+    })),
+  ]
+  const selectedValue = activity.assignmentId || ''
+  const disabledAttr = canEdit() ? '' : ' disabled'
+  return '<select class="activity-select" data-edit-path="activities.entries.' + escapeHtml(activity.id) + '.assignment_id"' + disabledAttr + '>' + renderSelectOptions(options, selectedValue) + '</select>'
+}
+
+function renderSequenceSelect(dayActivities, activity) {
+  const options = buildSequenceOptions(dayActivities, activity.id)
+  const disabledAttr = canEdit() ? '' : ' disabled'
+  return '<select class="activity-select activity-select--sequence" data-edit-path="activities.entries.' + escapeHtml(activity.id) + '.sequence"' + disabledAttr + '>' + renderSelectOptions(options, String(activity.sequence || 1)) + '</select>'
+}
+
+function renderActivityCard(dayDate, dayActivities, dayAssignments, activity) {
+  const titlePath = 'activities.entries.' + activity.id + '.title'
+  const timePath = 'activities.entries.' + activity.id + '.time'
+  const notePath = 'activities.entries.' + activity.id + '.note'
+  const linkPath = 'activities.entries.' + activity.id + '.link'
+  const attachmentPath = 'activities.entries.' + activity.id + '.attachment_path'
+  const title = getEditableValue(titlePath, activity.title || '')
+  const time = getEditableValue(timePath, activity.time || '')
+  const note = getEditableValue(notePath, activity.note || '')
+  const link = getEditableValue(linkPath, activity.link || '')
+  const attachmentPathValue = getEditableValue(attachmentPath, activity.attachmentPath || '')
+  const lowerTitle = String(title || '').toLowerCase()
+  const isSpecialActivity = lowerTitle.includes('lunch') || lowerTitle.includes('hangout')
+  const relatedAssignments = (time.trim().length > 0 || isSpecialActivity)
+    ? findAssignmentsForActivity(title, dayAssignments)
+    : []
+  const assignmentHints = relatedAssignments.map((assignment) => {
+    return '<div class="assignment-inline">' + renderAssignmentDetails(assignment, title) + '</div>'
+  }).join('')
+  const maybeHangoutPrompt = (lowerTitle.includes('hangout') || lowerTitle.includes('free time'))
+    ? renderHangoutPrompt()
+    : ''
+  const deleteDisabledAttr = canEdit() ? '' : ' disabled'
+
+  return [
+    '<li class="activity-card" data-activity-id="' + escapeHtml(activity.id) + '">',
+    '<div class="activity-card__top">',
+    '<div class="activity-card__sequence">',
+    '<span class="activity-label">Sequence</span>',
+    renderSequenceSelect(dayActivities, activity),
+    '</div>',
+    '<div class="activity-card__title">' + renderEditableText(titlePath, title, 'Add title', 'inline-activity-title') + '</div>',
+    '<button class="activity-delete-button" type="button" data-delete-activity-id="' + escapeHtml(activity.id) + '" data-day-date="' + escapeHtml(dayDate) + '"' + deleteDisabledAttr + '>Delete</button>',
+    '</div>',
+    '<div class="activity-card__grid">',
+    '<div class="activity-card__field"><span class="activity-label">Time</span>' + renderEditableText(timePath, time, 'Add time', 'inline-activity-time') + '</div>',
+    '<div class="activity-card__field"><span class="activity-label">Assignment</span>' + renderAssignmentSelect(activity, dayAssignments) + '</div>',
+    '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Note</span>' + renderEditableText(notePath, note, 'Add note', 'inline-activity-note') + '</div>',
+    '<div class="activity-card__field"><span class="activity-label">Link</span>' + renderEditableText(linkPath, link, 'Add link', 'inline-activity-link') + '</div>',
+    '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Attachment</span>' + renderEditableText(attachmentPath, attachmentPathValue, 'Add attachment path', 'inline-activity-attachment') + '</div>',
+    '</div>',
+    assignmentHints,
+    maybeHangoutPrompt,
+    '</li>',
+  ].join('')
+}
+
+function renderActivityCreateForm(dayDate, dayActivities, dayAssignments) {
+  const sequenceOptions = buildSequenceOptions(dayActivities)
+  const assignmentOptions = [
+    { value: '', label: 'No assignment' },
+    ...dayAssignments.map((assignment) => ({
+      value: assignment.id,
+      label: getAssignmentLabel(assignment),
+    })),
+  ]
+  const disabledAttr = canEdit() ? '' : ' disabled'
+
+  return [
+    '<form class="activity-create-form" data-day-date="' + escapeHtml(dayDate) + '">',
+    '<h3>Add Activity</h3>',
+    '<div class="activity-create-form__grid">',
+    '<label><span class="activity-label">Title</span><input name="title" type="text" placeholder="Activity title" required' + disabledAttr + ' /></label>',
+    '<label><span class="activity-label">Time</span><input name="time" type="text" placeholder="Optional time"' + disabledAttr + ' /></label>',
+    '<label class="activity-create-form__wide"><span class="activity-label">Note</span><textarea name="note" rows="2" placeholder="Optional note"' + disabledAttr + '></textarea></label>',
+    '<label><span class="activity-label">Assignment</span><select name="assignment_id"' + disabledAttr + '>' + renderSelectOptions(assignmentOptions, '') + '</select></label>',
+    '<label><span class="activity-label">Link</span><input name="link" type="text" placeholder="Optional URL"' + disabledAttr + ' /></label>',
+    '<label class="activity-create-form__wide"><span class="activity-label">Attachment path</span><input name="attachment_path" type="text" placeholder="Optional storage path"' + disabledAttr + ' /></label>',
+    '<label><span class="activity-label">Sequence</span><select name="sequence"' + disabledAttr + '>' + renderSelectOptions(sequenceOptions, sequenceOptions.length ? sequenceOptions[sequenceOptions.length - 1].value : '1') + '</select></label>',
+    '</div>',
+    '<div class="activity-create-form__actions"><button type="submit"' + disabledAttr + '>Add activity</button></div>',
+    '</form>',
+  ].join('')
+}
+
+async function persistActivityOrder(day, orderedActivities) {
+  const desiredOrder = orderedActivities.filter(Boolean)
+
+  for (const [index, activity] of desiredOrder.entries()) {
+    const { error } = await supabase
+      .from('activities')
+      .update({ sequence: -(index + 1) })
+      .eq('id', activity.id)
+
+    if (error) throw error
+  }
+
+  for (const [index, activity] of desiredOrder.entries()) {
+    const nextSequence = index + 1
+    const { error } = await supabase
+      .from('activities')
+      .update({ sequence: nextSequence })
+      .eq('id', activity.id)
+
+    if (error) throw error
+    activity.sequence = nextSequence
+  }
+
+  day.activities = desiredOrder
+}
+
+async function handleActivityCreateSubmit(event) {
+  event.preventDefault()
+  if (!canEdit()) return
+
+  const form = event.currentTarget
+  const dayDate = form.dataset.dayDate
+  const day = state.data.schedule?.content?.days?.find((entry) => entry.date === dayDate)
+  if (!day) return
+
+  const formData = new FormData(form)
+  const title = String(formData.get('title') || '').trim()
+  if (!title) return
+
+  const existingActivities = getSortedActivities(day.activities)
+  const sequenceValue = Number(formData.get('sequence') || existingActivities.length + 1)
+  const targetSequence = Math.max(1, Math.min(sequenceValue, existingActivities.length + 1))
+  const assignmentValue = String(formData.get('assignment_id') || '').trim() || null
+
+  const { data, error } = await supabase
+    .from('activities')
+    .insert({
+      schedule_day_id: day.id,
+      sequence: 0,
+      title,
+      time: String(formData.get('time') || '').trim() || null,
+      note: String(formData.get('note') || '').trim() || null,
+      assignment_id: assignmentValue,
+      link: String(formData.get('link') || '').trim() || null,
+      attachment_path: String(formData.get('attachment_path') || '').trim() || null,
+    })
+    .select('id, schedule_day_id, sequence, title, time, note, assignment_id, link, attachment_path')
+    .single()
+
+  if (error) {
+    window.alert('Failed to add activity: ' + error.message)
+    return
+  }
+
+  const newActivity = {
+    id: data.id,
+    sequence: data.sequence,
+    title: data.title,
+    time: data.time,
+    note: data.note,
+    assignmentId: data.assignment_id,
+    link: data.link,
+    attachmentPath: data.attachment_path,
+  }
+
+  const insertIndex = Math.max(0, Math.min(targetSequence - 1, existingActivities.length))
+  const reordered = [...existingActivities]
+  reordered.splice(insertIndex, 0, newActivity)
+
+  try {
+    await persistActivityOrder(day, reordered)
+    form.reset()
+    render()
+  } catch (persistError) {
+    window.alert('Activity saved, but the order update failed: ' + (persistError?.message ?? String(persistError)))
+  }
+}
+
+async function handleActivityDelete(event) {
+  const button = event.currentTarget
+  const activityId = button.dataset.deleteActivityId
+  const dayDate = button.dataset.dayDate
+  if (!activityId || !dayDate) return
+
+  if (!window.confirm('Delete this activity?')) return
+
+  const day = state.data.schedule?.content?.days?.find((entry) => entry.date === dayDate)
+  const activity = day?.activities?.find((entry) => entry.id === activityId)
+  if (!day || !activity) return
+
+  const nextActivities = getSortedActivities(day.activities).filter((entry) => entry.id !== activityId)
+
+  const { error } = await supabase
+    .from('activities')
+    .delete()
+    .eq('id', activityId)
+
+  if (error) {
+    window.alert('Failed to delete activity: ' + error.message)
+    return
+  }
+
+  try {
+    await persistActivityOrder(day, nextActivities)
+    render()
+  } catch (persistError) {
+    window.alert('Activity deleted, but the order update failed: ' + (persistError?.message ?? String(persistError)))
+  }
+}
+
+async function handleActivitySelectChange(event) {
+  if (!canEdit()) return
+
+  const select = event.currentTarget
+  const path = select.dataset.editPath
+  if (!path) return
+
+  const nextValue = String(select.value || '').trim()
+  setEditStatus(path, 'saving')
+  render()
+
+  const saved = await persistEditableValue(path, nextValue)
+  if (saved) {
+    clearDraftValue(path)
+    setEditStatus(path, 'saved')
+    render()
+    setTimeout(() => {
+      if (editStatus[path] === 'saved') {
+        setEditStatus(path, null)
+        render()
+      }
+    }, 1200)
+  } else {
+    setDraftValue(path, nextValue)
+    setEditStatus(path, 'error')
+    render()
+    setTimeout(() => {
+      if (editStatus[path] === 'error') {
+        setEditStatus(path, null)
+        render()
+      }
+    }, 2000)
+  }
+}
+
+function bindActivityControls() {
+  const selects = document.querySelectorAll('.activity-select')
+  for (const select of selects) {
+    if (select.dataset.bound === 'true') continue
+    select.dataset.bound = 'true'
+    select.addEventListener('change', handleActivitySelectChange)
+  }
+
+  const deleteButtons = document.querySelectorAll('.activity-delete-button')
+  for (const button of deleteButtons) {
+    if (button.dataset.bound === 'true') continue
+    button.dataset.bound = 'true'
+    button.addEventListener('click', handleActivityDelete)
+  }
+
+  const forms = document.querySelectorAll('.activity-create-form')
+  for (const form of forms) {
+    if (form.dataset.bound === 'true') continue
+    form.dataset.bound = 'true'
+    form.addEventListener('submit', handleActivityCreateSubmit)
+  }
 }
 
 function findAssignmentsForActivity(activityTitle, dayAssignments) {
@@ -824,28 +1130,50 @@ async function persistEditableValue(path, value) {
       }
     }
 
-    const scheduleMatch = path.match(/^schedule\.days\.([^.]+)\.timeline\.(\d+)\.(title|time|note)$/)
-    if (scheduleMatch) {
-      const dayDate = scheduleMatch[1]
-      const itemIndex = Number(scheduleMatch[2])
-      const field = scheduleMatch[3]
-      const day = state.data.schedule?.content?.days?.find((entry) => entry.date === dayDate)
-      const item = day?.timeline?.[itemIndex]
+    const activityMatch = path.match(/^activities\.entries\.([^.]+)\.(title|time|note|link|attachment_path|assignment_id|sequence)$/)
+    if (activityMatch) {
+      const activityId = activityMatch[1]
+      const field = activityMatch[2]
+      const context = findActivityContextById(activityId)
+      const day = context.day
+      const activity = context.activity
 
-      if (!item || !item.id) {
-        throw new Error('Schedule item not found for path: ' + path)
+      if (!day || !activity) {
+        throw new Error('Activity not found for path: ' + path)
+      }
+
+      if (field === 'sequence') {
+        const desiredSequence = Math.max(1, Number(normalized || activity.sequence || 1))
+        const reordered = getSortedActivities(day.activities).filter((entry) => entry.id !== activityId)
+        reordered.splice(Math.min(desiredSequence - 1, reordered.length), 0, activity)
+        await persistActivityOrder(day, reordered)
+        return true
       }
 
       const payload = {}
-      payload[field] = normalized || null
+      if (field === 'assignment_id') {
+        payload.assignment_id = normalized || null
+      } else if (field === 'attachment_path') {
+        payload.attachment_path = normalized || null
+      } else {
+        payload[field] = normalized || null
+      }
 
       const { error } = await supabase
-        .from('schedule_items')
+        .from('activities')
         .update(payload)
-        .eq('id', item.id)
+        .eq('id', activity.id)
 
       if (error) throw error
-      item[field] = normalized
+
+      if (field === 'assignment_id') {
+        activity.assignmentId = payload.assignment_id
+      } else if (field === 'attachment_path') {
+        activity.attachmentPath = payload.attachment_path
+      } else {
+        activity[field] = payload[field]
+      }
+
       return true
     }
 
