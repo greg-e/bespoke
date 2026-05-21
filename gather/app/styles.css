@@ -1,3 +1,45 @@
+.activity-details-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem 1.5rem;
+  align-items: center;
+  margin-bottom: 0.2rem;
+}
+
+.activity-detail {
+  font-size: 0.98rem;
+  color: var(--text);
+  min-width: 0;
+}
+
+.activity-detail__title {
+  font-weight: 600;
+  font-size: 1.08rem;
+  margin-right: 0.7rem;
+}
+
+.activity-detail__sequence {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.7rem;
+}
+
+.activity-details-below {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-left: 1.5rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+.activity-detail-below {
+  font-size: 0.86rem;
+  color: var(--muted);
+  min-width: 0;
+}
 :root {
   --bg: #fff;
   --surface: #fff;

@@ -614,23 +614,25 @@ function renderAttachmentField(activity) {
 function renderActivityCard(dayDate, dayActivities, activity) {
   // View-only mode for non-authenticated users
   if (!canEdit()) {
-    const rows = []
-    rows.push('<div class="activity"><strong>' + escapeHtml(activity.title || 'Untitled') + '</strong></div>')
-    if (activity.time) rows.push('<div class="activity">Time: ' + escapeHtml(activity.time) + '</div>')
-    if (activity.assignment) rows.push('<div class="activity">Assignment: ' + escapeHtml(activity.assignment) + '</div>')
-    if (activity.note) rows.push('<div class="activity">Note: ' + escapeHtml(activity.note) + '</div>')
+    const detailsRow = [
+      '<div class="activity-details-row">',
+      activity.time ? '<span class="activity-detail activity-detail__title"><strong>' + escapeHtml(activity.time) + '</strong></span>' : '',
+      '<span class="activity-detail activity-detail__title"><strong>' + escapeHtml(activity.title || 'Untitled') + '</strong></span>',
+      activity.assignment ? '<span class="activity-detail">' + escapeHtml(activity.assignment) + '</span>' : '',
+      activity.note ? '<span class="activity-detail">' + escapeHtml(activity.note) + '</span>' : '',
+      '</div>'
+    ].join('')
 
     const linkUrl = normalizeExternalUrl(activity.link)
-    if (linkUrl) {
-      rows.push('<div class="activity">Link: <a class="activity-inline-link" href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener">Open link</a></div>')
-    }
-
     const attachmentUrl = getAttachmentPublicUrl(activity.attachmentPath)
-    if (attachmentUrl) {
-      rows.push('<div class="activity">Attachment: <a class="activity-inline-link" href="' + escapeHtml(attachmentUrl) + '" target="_blank" rel="noopener">' + escapeHtml(getAttachmentFileName(activity.attachmentPath) || 'Open attachment') + '</a></div>')
-    }
+    const belowRow = [
+      '<div class="activity-details-below">',
+      linkUrl ? '<span class="activity-detail-below"><span class="activity-label">Link:</span> <a class="activity-inline-link" href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener">Open link</a></span>' : '',
+      attachmentUrl ? '<span class="activity-detail-below"><span class="activity-label">Attachment:</span> <a class="activity-inline-link" href="' + escapeHtml(attachmentUrl) + '" target="_blank" rel="noopener">' + escapeHtml(getAttachmentFileName(activity.attachmentPath) || 'Open attachment') + '</a></span>' : '',
+      '</div>'
+    ].join('')
 
-    return rows.join('')
+    return '<li class="activity-card">' + detailsRow + belowRow + '</li>'
   }
 
   // Edit mode for authenticated users
@@ -646,23 +648,32 @@ function renderActivityCard(dayDate, dayActivities, activity) {
   const assignment = getEditableValue(assignmentPath, activity.assignment || '')
   const deleteDisabledAttr = ''
 
+  // Main details row
+  const detailsRow = [
+    '<div class="activity-details-row">',
+    time ? '<span class="activity-detail activity-detail__title">' + renderEditableText(timePath, time, 'Add time', 'inline-activity-time') + '</span>' : '',
+    '<span class="activity-detail activity-detail__title">' + renderEditableText(titlePath, title, 'Add title', 'inline-activity-title') + '</span>',
+    '<span class="activity-detail">' + renderEditableText(assignmentPath, assignment, 'Add assignment', 'inline-activity-assignment') + '</span>',
+    '<span class="activity-detail">' + renderEditableText(notePath, note, 'Add note', 'inline-activity-note') + '</span>',
+    '<span class="activity-detail activity-detail__sequence">',
+    renderSequenceSelect(dayActivities, activity),
+    '</span>',
+    '<button class="activity-delete-button" type="button" data-delete-activity-id="' + escapeHtml(activity.id) + '" data-day-date="' + escapeHtml(dayDate) + '"' + deleteDisabledAttr + '>Delete</button>',
+    '</div>'
+  ].join('')
+
+  // Link and attachment below
+  const belowRow = [
+    '<div class="activity-details-below">',
+    '<span class="activity-detail-below">' + renderLinkField(linkPath, link) + '</span>',
+    '<span class="activity-detail-below">' + renderAttachmentField(activity) + '</span>',
+    '</div>'
+  ].join('')
+
   return [
     '<li class="activity-card" data-activity-id="' + escapeHtml(activity.id) + '">',
-    '<div class="activity-card__title activity-card__title--top">' + renderEditableText(titlePath, title, 'Add title', 'inline-activity-title') + '</div>',
-    '<div class="activity-card__top">',
-    '<div class="activity-card__sequence">',
-    '<span class="activity-label">Sequence</span>',
-    renderSequenceSelect(dayActivities, activity),
-    '</div>',
-    '<button class="activity-delete-button" type="button" data-delete-activity-id="' + escapeHtml(activity.id) + '" data-day-date="' + escapeHtml(dayDate) + '"' + deleteDisabledAttr + '>Delete</button>',
-    '</div>',
-    '<div class="activity-card__grid">',
-    '<div class="activity-card__field"><span class="activity-label">Time</span>' + renderEditableText(timePath, time, 'Add time', 'inline-activity-time') + '</div>',
-    '<div class="activity-card__field"><span class="activity-label">Assignment</span>' + renderEditableText(assignmentPath, assignment, 'Add assignment', 'inline-activity-assignment') + '</div>',
-    '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Note</span>' + renderEditableText(notePath, note, 'Add note', 'inline-activity-note') + '</div>',
-    '<div class="activity-card__field"><span class="activity-label">Link</span>' + renderLinkField(linkPath, link) + '</div>',
-    '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Attachment</span>' + renderAttachmentField(activity) + '</div>',
-    '</div>',
+    detailsRow,
+    belowRow,
     '</li>',
   ].join('')
 }
