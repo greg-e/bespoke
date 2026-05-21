@@ -5,7 +5,7 @@ create table if not exists public.activities (
   title text not null,
   time text,
   note text,
-  assignment_id uuid references public.assignments (id) on delete set null,
+  assignment text,
   link text,
   attachment_path text,
   created_at timestamptz not null default now(),
@@ -14,7 +14,6 @@ create table if not exists public.activities (
 );
 
 create index if not exists activities_day_idx on public.activities (schedule_day_id, sequence);
-create index if not exists activities_assignment_idx on public.activities (assignment_id);
 
 drop trigger if exists set_activities_updated_at on public.activities;
 create trigger set_activities_updated_at

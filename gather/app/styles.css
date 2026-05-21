@@ -114,8 +114,9 @@ h1 {
 
 .app-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  gap: 1rem;
   margin-top: 0.75rem;
   border-top: 1px solid var(--line);
   padding: 0.5rem 1.2rem 0.5rem 1.2rem;
@@ -495,7 +496,7 @@ h1 {
 }
 
 .accordion-day.is-expanded .accordion-content {
-  max-height: 3000px;
+  max-height: 10000px;
 }
 
 @media (max-width: 720px) {
@@ -542,6 +543,10 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--muted);
+  border: none;
+  background: none;
+  cursor: pointer;
 }
 
 .badge {
@@ -584,6 +589,21 @@ h1 {
   margin: 0;
   display: grid;
   gap: 0.7rem;
+}
+
+.activity {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text);
+  font-family: 'Fraunces', serif;
+  letter-spacing: 0.02em;
+}
+
+.activity:last-child {
+  border-bottom: none;
 }
 
 .activity-card {

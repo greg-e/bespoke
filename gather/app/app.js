@@ -6,7 +6,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const STORAGE_PREFIX = 'gather-june-2026:'
 const DRAFT_STORAGE_KEY = STORAGE_PREFIX + 'drafts'
-const ACTIVITY_TITLE_PREFIX = 'activity_title:'
+const SIMULATED_AUTH_KEY = STORAGE_PREFIX + 'simulated-auth'
 
 const drafts = loadDrafts()
 const editStatus = {}
@@ -19,6 +19,7 @@ const state = {
   hasDraftEdits: Object.keys(drafts).length > 0,
   session: null,
   userEmail: '',
+  simulatedAuth: false,
 }
 
 const el = {
@@ -51,13 +52,13 @@ async function bootstrap() {
   await initializeAuth()
 
   const site = await loadSiteMetadata()
-  const assignments = await loadAssignments()
   const schedule = await loadSchedule()
+  const activityAssignments = await loadActivityAssignments()
   const food = await loadFood()
 
   state.data.site = site
-  state.data.assignments = assignments
   state.data.schedule = schedule
+  state.data.activityAssignments = activityAssignments
   state.data.food = food
 
   state.hasDraftEdits = Object.keys(drafts).length > 0
@@ -69,19 +70,68 @@ async function bootstrap() {
 }
 
 function canEdit() {
-  return Boolean(state.session)
+  return Boolean(state.session || state.simulatedAuth)
+}
+
+function isLocalDevelopmentHost() {
+  const hostname = window.location.hostname
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+}
+
+function syncSimulatedAuthFromUrl() {
+  if (!isLocalDevelopmentHost()) {
+    return
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  const simulateValue = params.get('simulateAuth')
+  if (simulateValue === '1') {
+    localStorage.setItem(SIMULATED_AUTH_KEY, '1')
+  } else if (simulateValue === '0') {
+    localStorage.removeItem(SIMULATED_AUTH_KEY)
+  }
+}
+
+function applySimulatedAuthState() {
+  if (!isLocalDevelopmentHost()) {
+    state.simulatedAuth = false
+    return
+  }
+
+  state.simulatedAuth = localStorage.getItem(SIMULATED_AUTH_KEY) === '1'
+}
+
+function clearSimulatedAuthState() {
+  localStorage.removeItem(SIMULATED_AUTH_KEY)
+  state.simulatedAuth = false
 }
 
 async function initializeAuth() {
+  syncSimulatedAuthFromUrl()
+  applySimulatedAuthState()
+
   const { data, error } = await supabase.auth.getSession()
   if (!error) {
     state.session = data?.session || null
-    state.userEmail = state.session?.user?.email || ''
+    if (state.session) {
+      state.userEmail = state.session?.user?.email || ''
+    } else if (state.simulatedAuth) {
+      state.userEmail = 'simulated@localhost'
+    } else {
+      state.userEmail = ''
+    }
   }
 
   supabase.auth.onAuthStateChange((_event, session) => {
     state.session = session || null
-    state.userEmail = state.session?.user?.email || ''
+    applySimulatedAuthState()
+    if (state.session) {
+      state.userEmail = state.session?.user?.email || ''
+    } else if (state.simulatedAuth) {
+      state.userEmail = 'simulated@localhost'
+    } else {
+      state.userEmail = ''
+    }
     render()
   })
 }
@@ -210,44 +260,17 @@ async function loadSiteMetadata() {
   }
 }
 
-async function loadAssignments() {
-  try {
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('id, day, type, assignee, note')
-      .order('day', { ascending: true })
-      .order('type', { ascending: true })
-
-    if (error) {
-      throw error
-    }
-
-    return {
-      content: {
-        entries: (data || []).map((entry) => ({
-          ...entry,
-          activity_title: extractActivityTitle(entry.note),
-        })),
-      },
-      source: 'network',
-    }
-  } catch (error) {
-    throw new Error('Failed to load assignments: ' + (error?.message ?? String(error)))
-  }
-}
-
 async function loadSchedule() {
   try {
-    const [{ data: days, error: daysError }, { data: activities, error: activitiesError }] = await Promise.all([
-      supabase
-        .from('schedule_days')
-        .select('id, day_date, label, short_label')
-        .order('day_date', { ascending: true }),
-      supabase
-        .from('activities')
-        .select('id, schedule_day_id, sequence, title, time, note, assignment_id, link, attachment_path')
-        .order('sequence', { ascending: true }),
-    ])
+    const { data: days, error: daysError } = await supabase
+      .from('schedule_days')
+      .select('id, day_date, label, short_label')
+      .order('day_date', { ascending: true })
+
+    const { data: activities, error: activitiesError } = await supabase
+      .from('activities')
+      .select('id, schedule_day_id, sequence, title, time, note, assignment, link, attachment_path')
+      .order('sequence', { ascending: true })
 
     if (daysError) throw daysError
     if (activitiesError) throw activitiesError
@@ -263,7 +286,7 @@ async function loadSchedule() {
         title: activity.title,
         time: activity.time,
         note: activity.note,
-        assignmentId: activity.assignment_id,
+        assignment: activity.assignment,
         link: activity.link,
         attachmentPath: activity.attachment_path,
       })
@@ -283,6 +306,42 @@ async function loadSchedule() {
     }
   } catch (error) {
     throw new Error('Failed to load schedule: ' + (error?.message ?? String(error)))
+  }
+}
+
+async function loadActivityAssignments() {
+  try {
+    const [{ data: activities, error: activitiesError }, { data: days, error: daysError }] = await Promise.all([
+      supabase
+        .from('activities')
+        .select('id, schedule_day_id, title, assignment, sequence')
+        .order('sequence', { ascending: true }),
+      supabase
+        .from('schedule_days')
+        .select('id, day_date, label')
+        .order('day_date', { ascending: true }),
+    ])
+
+    if (activitiesError) throw activitiesError
+    if (daysError) throw daysError
+
+    const dayLabels = new Map((days || []).map((day) => [day.id, day.label || day.day_date]))
+
+    return {
+      content: {
+        entries: (activities || []).map((activity) => ({
+          id: activity.id,
+          dayId: activity.schedule_day_id,
+          dayLabel: dayLabels.get(activity.schedule_day_id) || '',
+          title: activity.title || '(untitled)',
+          assignment: String(activity.assignment || '').trim(),
+          sequence: activity.sequence || 0,
+        })),
+      },
+      source: 'network',
+    }
+  } catch (error) {
+    throw new Error('Failed to load activity assignments: ' + (error?.message ?? String(error)))
   }
 }
 
@@ -335,7 +394,7 @@ function render() {
 
   renderFooterStatus()
 
-  const hasCoreData = state.data.site && state.data.assignments && state.data.schedule && state.data.food
+  const hasCoreData = state.data.site && state.data.schedule && state.data.food
   if (!hasCoreData) {
     return
   }
@@ -360,10 +419,11 @@ function renderFooterStatus() {
 
   if (canEdit()) {
     const emailLabel = escapeHtml(state.userEmail || 'signed in user')
-    parts.push('<span class="badge ok">Edit mode: ' + emailLabel + '</span>')
+    const modeLabel = state.simulatedAuth && !state.session ? 'Edit mode (simulated): ' : 'Edit mode: '
+    parts.push('<span class="badge ok">' + modeLabel + emailLabel + '</span>')
     parts.push('<button class="auth-action" type="button" data-auth-action="signout">Sign out</button>')
   } else {
-    parts.push('<button class="auth-action auth-action-icon" type="button" data-auth-action="signin" aria-label="Sign in to edit" title="Sign in to edit"><span aria-hidden="true">&#128273;</span></button>')
+    parts.push('<button class="auth-action auth-action-icon" type="button" data-auth-action="signin" aria-label="Sign in to edit" title="Sign in to edit"><span aria-hidden="true">○</span></button>')
   }
 
   const footerStatus = document.getElementById('footer-status')
@@ -375,7 +435,6 @@ function renderFooterStatus() {
 function renderAccordion() {
   const site = state.data.site.content
   const schedule = state.data.schedule.content
-  const assignments = state.data.assignments.content
   const locationName = site.location?.name || ''
   const mapOpenUrl = site.location?.mapOpenUrl || ''
 
@@ -402,7 +461,6 @@ function renderAccordion() {
 
   for (const day of schedule.days) {
     const isExpanded = state.expandedDays.has(day.date)
-    const dayAssignments = assignments.entries.filter((entry) => entry.day === day.date)
     const dayActivities = getSortedActivities(day.activities)
 
     html += '<div class="accordion-day ' + (isExpanded ? 'is-expanded' : '') + '" data-date="' + escapeHtml(day.date) + '">'
@@ -413,19 +471,14 @@ function renderAccordion() {
     html += '<div class="accordion-body">'
 
     html += '<div class="activities-section">'
-    html += '<div class="activities-section__header">Activities</div>'
 
     if (dayActivities.length > 0) {
-      html += '<ul class="activities-list">'
       for (const activity of dayActivities) {
-        html += renderActivityCard(day.date, dayActivities, dayAssignments, activity)
+        html += renderActivityCard(day.date, dayActivities, activity)
       }
-      html += '</ul>'
-    } else {
-      html += '<p class="muted">No activities for this day yet.</p>'
     }
 
-    html += renderActivityCreateForm(day.date, dayActivities, dayAssignments)
+    html += renderActivityCreateForm(day.date, dayActivities)
     html += '</div>'
 
     html += '</div>' // accordion-body
@@ -453,12 +506,6 @@ function findActivityContextById(activityId) {
   }
 
   return { day: null, activity: null }
-}
-
-function getAssignmentLabel(assignment) {
-  const type = String(assignment.type || '').trim()
-  const assignee = String(assignment.assignee || '').trim()
-  return [type, assignee].filter(Boolean).join(' - ') || 'Unassigned'
 }
 
 function buildSequenceOptions(dayActivities, currentActivityId = null) {
@@ -496,48 +543,40 @@ function renderSelectOptions(options, selectedValue) {
   }).join('')
 }
 
-function renderAssignmentSelect(activity, dayAssignments) {
-  const options = [
-    { value: '', label: 'No assignment' },
-    ...dayAssignments.map((assignment) => ({
-      value: assignment.id,
-      label: getAssignmentLabel(assignment),
-    })),
-  ]
-  const selectedValue = activity.assignmentId || ''
-  const disabledAttr = canEdit() ? '' : ' disabled'
-  return '<select class="activity-select" data-edit-path="activities.entries.' + escapeHtml(activity.id) + '.assignment_id"' + disabledAttr + '>' + renderSelectOptions(options, selectedValue) + '</select>'
-}
-
 function renderSequenceSelect(dayActivities, activity) {
   const options = buildSequenceOptions(dayActivities, activity.id)
   const disabledAttr = canEdit() ? '' : ' disabled'
   return '<select class="activity-select activity-select--sequence" data-edit-path="activities.entries.' + escapeHtml(activity.id) + '.sequence"' + disabledAttr + '>' + renderSelectOptions(options, String(activity.sequence || 1)) + '</select>'
 }
 
-function renderActivityCard(dayDate, dayActivities, dayAssignments, activity) {
+function renderActivityCard(dayDate, dayActivities, activity) {
+  // View-only mode for non-authenticated users
+  if (!canEdit()) {
+    const title = activity.title || 'Untitled'
+    const time = activity.time ? ' - ' + activity.time : ''
+    const assignment = activity.assignment ? ' - ' + activity.assignment : ''
+    const note = activity.note ? ' - ' + activity.note : ''
+    const link = activity.link ? ' - ' + activity.link : ''
+    const attachment = activity.attachmentPath ? ' - ' + activity.attachmentPath : ''
+    
+    const displayText = title + time + assignment + note + link + attachment
+    return '<div class="activity">' + escapeHtml(displayText) + '</div>'
+  }
+
+  // Edit mode for authenticated users
   const titlePath = 'activities.entries.' + activity.id + '.title'
   const timePath = 'activities.entries.' + activity.id + '.time'
   const notePath = 'activities.entries.' + activity.id + '.note'
   const linkPath = 'activities.entries.' + activity.id + '.link'
   const attachmentPath = 'activities.entries.' + activity.id + '.attachment_path'
+  const assignmentPath = 'activities.entries.' + activity.id + '.assignment'
   const title = getEditableValue(titlePath, activity.title || '')
   const time = getEditableValue(timePath, activity.time || '')
   const note = getEditableValue(notePath, activity.note || '')
   const link = getEditableValue(linkPath, activity.link || '')
   const attachmentPathValue = getEditableValue(attachmentPath, activity.attachmentPath || '')
-  const lowerTitle = String(title || '').toLowerCase()
-  const isSpecialActivity = lowerTitle.includes('lunch') || lowerTitle.includes('hangout')
-  const relatedAssignments = (time.trim().length > 0 || isSpecialActivity)
-    ? findAssignmentsForActivity(title, dayAssignments)
-    : []
-  const assignmentHints = relatedAssignments.map((assignment) => {
-    return '<div class="assignment-inline">' + renderAssignmentDetails(assignment, title) + '</div>'
-  }).join('')
-  const maybeHangoutPrompt = (lowerTitle.includes('hangout') || lowerTitle.includes('free time'))
-    ? renderHangoutPrompt()
-    : ''
-  const deleteDisabledAttr = canEdit() ? '' : ' disabled'
+  const assignment = getEditableValue(assignmentPath, activity.assignment || '')
+  const deleteDisabledAttr = ''
 
   return [
     '<li class="activity-card" data-activity-id="' + escapeHtml(activity.id) + '">',
@@ -551,43 +590,38 @@ function renderActivityCard(dayDate, dayActivities, dayAssignments, activity) {
     '</div>',
     '<div class="activity-card__grid">',
     '<div class="activity-card__field"><span class="activity-label">Time</span>' + renderEditableText(timePath, time, 'Add time', 'inline-activity-time') + '</div>',
-    '<div class="activity-card__field"><span class="activity-label">Assignment</span>' + renderAssignmentSelect(activity, dayAssignments) + '</div>',
+    '<div class="activity-card__field"><span class="activity-label">Assignment</span>' + renderEditableText(assignmentPath, assignment, 'Add assignment', 'inline-activity-assignment') + '</div>',
     '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Note</span>' + renderEditableText(notePath, note, 'Add note', 'inline-activity-note') + '</div>',
     '<div class="activity-card__field"><span class="activity-label">Link</span>' + renderEditableText(linkPath, link, 'Add link', 'inline-activity-link') + '</div>',
     '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Attachment</span>' + renderEditableText(attachmentPath, attachmentPathValue, 'Add attachment path', 'inline-activity-attachment') + '</div>',
     '</div>',
-    assignmentHints,
-    maybeHangoutPrompt,
     '</li>',
   ].join('')
 }
 
-function renderActivityCreateForm(dayDate, dayActivities, dayAssignments) {
-  const sequenceOptions = buildSequenceOptions(dayActivities)
-  const assignmentOptions = [
-    { value: '', label: 'No assignment' },
-    ...dayAssignments.map((assignment) => ({
-      value: assignment.id,
-      label: getAssignmentLabel(assignment),
-    })),
-  ]
-  const disabledAttr = canEdit() ? '' : ' disabled'
+function renderActivityCreateForm(dayDate, dayActivities) {
+  const sequenceOptions = buildSequenceOptions(dayActivities);
+  const disabledAttr = canEdit() ? '' : ' disabled';
+
+  if (!canEdit()) {
+    return '';
+  }
 
   return [
-    '<form class="activity-create-form" data-day-date="' + escapeHtml(dayDate) + '">',
+    '<form class="activity-create-form" data-day-date="' + escapeHtml(dayDate) + '">', 
     '<h3>Add Activity</h3>',
     '<div class="activity-create-form__grid">',
     '<label><span class="activity-label">Title</span><input name="title" type="text" placeholder="Activity title" required' + disabledAttr + ' /></label>',
     '<label><span class="activity-label">Time</span><input name="time" type="text" placeholder="Optional time"' + disabledAttr + ' /></label>',
     '<label class="activity-create-form__wide"><span class="activity-label">Note</span><textarea name="note" rows="2" placeholder="Optional note"' + disabledAttr + '></textarea></label>',
-    '<label><span class="activity-label">Assignment</span><select name="assignment_id"' + disabledAttr + '>' + renderSelectOptions(assignmentOptions, '') + '</select></label>',
+    '<label><span class="activity-label">Assignment</span><input name="assignment" type="text" placeholder="Add assignment"' + disabledAttr + ' /></label>',
     '<label><span class="activity-label">Link</span><input name="link" type="text" placeholder="Optional URL"' + disabledAttr + ' /></label>',
     '<label class="activity-create-form__wide"><span class="activity-label">Attachment path</span><input name="attachment_path" type="text" placeholder="Optional storage path"' + disabledAttr + ' /></label>',
     '<label><span class="activity-label">Sequence</span><select name="sequence"' + disabledAttr + '>' + renderSelectOptions(sequenceOptions, sequenceOptions.length ? sequenceOptions[sequenceOptions.length - 1].value : '1') + '</select></label>',
     '</div>',
     '<div class="activity-create-form__actions"><button type="submit"' + disabledAttr + '>Add activity</button></div>',
     '</form>',
-  ].join('')
+  ].join('');
 }
 
 async function persistActivityOrder(day, orderedActivities) {
@@ -614,44 +648,56 @@ async function persistActivityOrder(day, orderedActivities) {
   }
 
   day.activities = desiredOrder
+
+  const cachedAssignments = state.data.activityAssignments?.content?.entries
+  if (cachedAssignments) {
+    for (const [index, activity] of desiredOrder.entries()) {
+      const cachedAssignment = cachedAssignments.find((entry) => entry.id === activity.id)
+      if (cachedAssignment) {
+        cachedAssignment.sequence = index + 1
+      }
+    }
+  }
 }
 
 async function handleActivityCreateSubmit(event) {
-  event.preventDefault()
-  if (!canEdit()) return
+  event.preventDefault();
+  if (!canEdit()) return;
 
-  const form = event.currentTarget
-  const dayDate = form.dataset.dayDate
-  const day = state.data.schedule?.content?.days?.find((entry) => entry.date === dayDate)
-  if (!day) return
+  const form = event.currentTarget;
+  const dayDate = form.dataset.dayDate;
+  const day = state.data.schedule?.content?.days?.find((entry) => entry.date === dayDate);
+  if (!day) return;
 
-  const formData = new FormData(form)
-  const title = String(formData.get('title') || '').trim()
-  if (!title) return
+  const formData = new FormData(form);
+  const title = String(formData.get('title') || '').trim();
+  if (!title) return;
 
-  const existingActivities = getSortedActivities(day.activities)
-  const sequenceValue = Number(formData.get('sequence') || existingActivities.length + 1)
-  const targetSequence = Math.max(1, Math.min(sequenceValue, existingActivities.length + 1))
-  const assignmentValue = String(formData.get('assignment_id') || '').trim() || null
+  const existingActivities = getSortedActivities(day.activities);
+  const sequenceValue = Number(formData.get('sequence') || existingActivities.length + 1);
+  const targetSequence = Math.max(1, Math.min(sequenceValue, existingActivities.length + 1));
+  const assignmentValue = String(formData.get('assignment') || '').trim();
+
+  const insertPayload = {
+    schedule_day_id: day.id,
+    sequence: 0,
+    title,
+    time: String(formData.get('time') || '').trim() || null,
+    note: String(formData.get('note') || '').trim() || null,
+    assignment: assignmentValue || null,
+    link: String(formData.get('link') || '').trim() || null,
+    attachment_path: String(formData.get('attachment_path') || '').trim() || null,
+  }
 
   const { data, error } = await supabase
     .from('activities')
-    .insert({
-      schedule_day_id: day.id,
-      sequence: 0,
-      title,
-      time: String(formData.get('time') || '').trim() || null,
-      note: String(formData.get('note') || '').trim() || null,
-      assignment_id: assignmentValue,
-      link: String(formData.get('link') || '').trim() || null,
-      attachment_path: String(formData.get('attachment_path') || '').trim() || null,
-    })
-    .select('id, schedule_day_id, sequence, title, time, note, assignment_id, link, attachment_path')
-    .single()
+    .insert(insertPayload)
+    .select('id, schedule_day_id, sequence, title, time, note, assignment, link, attachment_path')
+    .single();
 
   if (error) {
-    window.alert('Failed to add activity: ' + error.message)
-    return
+    window.alert('Failed to add activity: ' + error.message);
+    return;
   }
 
   const newActivity = {
@@ -660,21 +706,33 @@ async function handleActivityCreateSubmit(event) {
     title: data.title,
     time: data.time,
     note: data.note,
-    assignmentId: data.assignment_id,
+    assignment: data.assignment,
     link: data.link,
     attachmentPath: data.attachment_path,
+  };
+
+  const cachedAssignments = state.data.activityAssignments?.content?.entries;
+  if (cachedAssignments) {
+    cachedAssignments.push({
+      id: newActivity.id,
+      dayId: day.id,
+      dayLabel: day.label || dayDate,
+      title: newActivity.title || '(untitled)',
+      assignment: String(newActivity.assignment || '').trim(),
+      sequence: newActivity.sequence || 0,
+    });
   }
 
-  const insertIndex = Math.max(0, Math.min(targetSequence - 1, existingActivities.length))
-  const reordered = [...existingActivities]
-  reordered.splice(insertIndex, 0, newActivity)
+  const insertIndex = Math.max(0, Math.min(targetSequence - 1, existingActivities.length));
+  const reordered = [...existingActivities];
+  reordered.splice(insertIndex, 0, newActivity);
 
   try {
-    await persistActivityOrder(day, reordered)
-    form.reset()
-    render()
+    await persistActivityOrder(day, reordered);
+    form.reset();
+    render();
   } catch (persistError) {
-    window.alert('Activity saved, but the order update failed: ' + (persistError?.message ?? String(persistError)))
+    window.alert('Activity saved, but the order update failed: ' + (persistError?.message ?? String(persistError)));
   }
 }
 
@@ -704,6 +762,10 @@ async function handleActivityDelete(event) {
 
   try {
     await persistActivityOrder(day, nextActivities)
+    const cachedAssignments = state.data.activityAssignments?.content?.entries
+    if (cachedAssignments) {
+      state.data.activityAssignments.content.entries = cachedAssignments.filter((entry) => entry.id !== activityId)
+    }
     render()
   } catch (persistError) {
     window.alert('Activity deleted, but the order update failed: ' + (persistError?.message ?? String(persistError)))
@@ -768,36 +830,6 @@ function bindActivityControls() {
   }
 }
 
-function findAssignmentsForActivity(activityTitle, dayAssignments) {
-  const title = (activityTitle || '').toLowerCase()
-  const matches = []
-
-  for (const assignment of dayAssignments) {
-    const type = (assignment.type || '').toLowerCase()
-    
-    // Match logic
-    if (title.includes('brunch') && type.includes('breakfast')) {
-      matches.push(assignment)
-    } else if (title.includes('group activity') && type.includes('activity')) {
-      matches.push(assignment)
-    } else if (title.includes('supper') && type.includes('meal')) {
-      matches.push(assignment)
-    } else if (title.includes('supper') && type.includes('cleanup')) {
-      matches.push(assignment)
-    } else if (title.includes('lunch') && type.includes('salad')) {
-      matches.push(assignment)
-    } else if (title.includes('devo') && type.includes('devo')) {
-      matches.push(assignment)
-    } else if ((title.includes('hangout') || title.includes('free')) && type.includes('hangout')) {
-      matches.push(assignment)
-    } else if (title.includes('cleanup') && type.includes('cleanup')) {
-      matches.push(assignment)
-    }
-  }
-  
-  return matches
-}
-
 function bindAccordionHandlers() {
   const headers = document.querySelectorAll('.accordion-header')
   for (const header of headers) {
@@ -859,38 +891,19 @@ function maybeTbd(text) {
 }
 
 function renderAssignments() {
-  const assignments = state.data.assignments.content
-  const daysMap = {}
-  const dayLabels = {}
+  const activityAssignments = state.data.activityAssignments?.content?.entries || []
 
-  // Build label map
-  const scheduleDays = state.data.schedule?.content?.days || assignments.days || []
-  for (const dayInfo of scheduleDays) {
-    dayLabels[dayInfo.date] = dayInfo.label
-  }
+  const filtered = activityAssignments.filter((entry) => {
+    const text = `${entry.dayLabel} ${entry.title} ${entry.assignment || 'TBD'}`.toLowerCase()
+    return state.searchQuery === '' || text.includes(state.searchQuery)
+  })
 
-  // Group assignments by day
-  for (const assignment of assignments.entries) {
-    const day = assignment.day
-    if (!daysMap[day]) {
-      daysMap[day] = []
-    }
-    daysMap[day].push(assignment)
-  }
+  filtered.sort((a, b) => {
+    const dayCompare = String(a.dayLabel || '').localeCompare(String(b.dayLabel || ''))
+    if (dayCompare !== 0) return dayCompare
+    return a.sequence - b.sequence || a.title.localeCompare(b.title)
+  })
 
-  // Filter based on search query
-  let filtered = []
-  for (const [date, assignmentsList] of Object.entries(daysMap)) {
-    for (const assignment of assignmentsList) {
-      const dayLabel = dayLabels[date] || date
-      const text = `${dayLabel} ${assignment.type} ${assignment.assignee}`.toLowerCase()
-      if (state.searchQuery === '' || text.includes(state.searchQuery)) {
-        filtered.push({ date, dayLabel, ...assignment })
-      }
-    }
-  }
-
-  // Render
   el.assignmentsList.innerHTML = ''
 
   if (filtered.length === 0) {
@@ -898,16 +911,13 @@ function renderAssignments() {
     return
   }
 
-  // Sort by date order
-  filtered.sort((a, b) => new Date(a.date) - new Date(b.date))
-
-  for (const assignment of filtered) {
+  for (const entry of filtered) {
     const item = document.createElement('div')
     item.className = 'assignment-item'
     item.innerHTML = `
-      <div class="assignment-day">${escapeHtml(assignment.dayLabel)}</div>
-      <div class="assignment-type">${escapeHtml(assignment.type)}</div>
-      <div class="assignment-person">${renderAssignmentDetails(assignment, assignment.dayLabel)}</div>
+      <div class="assignment-day">${escapeHtml(entry.dayLabel)}</div>
+      <div class="assignment-type">${escapeHtml(entry.title)}</div>
+      <div class="assignment-person">${renderAssignmentDetails(entry)}</div>
     `
     el.assignmentsList.appendChild(item)
   }
@@ -1084,53 +1094,11 @@ function setDraftValue(path, value) {
   saveDrafts()
 }
 
-function extractActivityTitle(note) {
-  const raw = String(note || '')
-  if (!raw.startsWith(ACTIVITY_TITLE_PREFIX)) return ''
-  return raw.slice(ACTIVITY_TITLE_PREFIX.length).trim()
-}
-
 async function persistEditableValue(path, value) {
   const normalized = String(value ?? '').trim()
 
   try {
-    const assignmentMatch = path.match(/^assignments\.entries\.([^.]+)\.(assignee|activity_title)$/)
-    if (assignmentMatch) {
-      const assignmentId = assignmentMatch[1]
-      const field = assignmentMatch[2]
-      const assignment = state.data.assignments?.content?.entries?.find((entry) => entry.id === assignmentId)
-
-      if (!assignment) {
-        throw new Error('Assignment not found for path: ' + path)
-      }
-
-      if (field === 'assignee') {
-        const nextAssignee = normalized || 'TBD'
-        const { error } = await supabase
-          .from('assignments')
-          .update({ assignee: nextAssignee })
-          .eq('id', assignmentId)
-
-        if (error) throw error
-        assignment.assignee = nextAssignee
-        return true
-      }
-
-      if (field === 'activity_title') {
-        const noteValue = normalized ? ACTIVITY_TITLE_PREFIX + normalized : null
-        const { error } = await supabase
-          .from('assignments')
-          .update({ note: noteValue })
-          .eq('id', assignmentId)
-
-        if (error) throw error
-        assignment.activity_title = normalized
-        assignment.note = noteValue
-        return true
-      }
-    }
-
-    const activityMatch = path.match(/^activities\.entries\.([^.]+)\.(title|time|note|link|attachment_path|assignment_id|sequence)$/)
+    const activityMatch = path.match(/^activities\.entries\.([^.]+)\.(title|time|note|link|attachment_path|assignment|sequence)$/)
     if (activityMatch) {
       const activityId = activityMatch[1]
       const field = activityMatch[2]
@@ -1151,8 +1119,8 @@ async function persistEditableValue(path, value) {
       }
 
       const payload = {}
-      if (field === 'assignment_id') {
-        payload.assignment_id = normalized || null
+      if (field === 'assignment') {
+        payload.assignment = normalized || null
       } else if (field === 'attachment_path') {
         payload.attachment_path = normalized || null
       } else {
@@ -1166,8 +1134,12 @@ async function persistEditableValue(path, value) {
 
       if (error) throw error
 
-      if (field === 'assignment_id') {
-        activity.assignmentId = payload.assignment_id
+      if (field === 'assignment') {
+        activity.assignment = payload.assignment
+        const cachedAssignment = state.data.activityAssignments?.content?.entries?.find((entry) => entry.id === activity.id)
+        if (cachedAssignment) {
+          cachedAssignment.assignment = payload.assignment || ''
+        }
       } else if (field === 'attachment_path') {
         activity.attachmentPath = payload.attachment_path
       } else {
@@ -1297,40 +1269,10 @@ function renderEditableText(path, value, placeholder, extraClass = '') {
   return '<span class="' + className + '" contenteditable="' + editable + '" spellcheck="false" data-edit-path="' + escapeHtml(path) + '" data-placeholder="' + escapeHtml(placeholder) + '" data-original-text="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>'
 }
 
-function renderAssignmentDetails(assignment, contextTitle = '') {
-  const type = String(assignment.type || '').toLowerCase()
-  const title = String(contextTitle || '').toLowerCase()
-  const assigneePath = 'assignments.entries.' + assignment.id + '.assignee'
-  const assigneeValue = getEditableValue(assigneePath, assignment.assignee === 'TBD' ? '' : assignment.assignee)
-  const assigneePlaceholder = canEdit() ? 'Add assignee' : 'TBD'
-
-  if (type.includes('cleanup')) {
-    return '<div class="assignment-detail assignment-detail--single"><span class="assignment-label">Cleanup Crew</span>' + renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee') + '</div>'
-  }
-
-  if (type.includes('activity')) {
-    const activityTitlePath = 'assignments.entries.' + assignment.id + '.activity_title'
-    const activityTitleValue = getEditableValue(activityTitlePath, '')
-
-    return [
-      '<div class="assignment-detail assignment-detail--stacked">',
-      '<div class="assignment-detail-row">',
-      '<span class="assignment-label">Activity title</span>',
-      renderEditableText(activityTitlePath, activityTitleValue, canEdit() ? 'Add activity title' : 'TBD', 'inline-assignment-title'),
-      '</div>',
-      '<div class="assignment-detail-row">',
-      '<span class="assignment-label">Lead</span>',
-      renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee'),
-      '</div>',
-      '</div>',
-    ].join('')
-  }
-
-  if (title.includes('lunch')) {
-    return renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee') + ' - ' + escapeHtml(assignment.type)
-  }
-
-  return renderEditableText(assigneePath, assigneeValue, assigneePlaceholder, 'inline-assignee')
+function renderAssignmentDetails(entry) {
+  const assignmentPath = 'activities.entries.' + entry.id + '.assignment'
+  const assignmentValue = getEditableValue(assignmentPath, entry.assignment || '')
+  return renderEditableText(assignmentPath, assignmentValue, 'TBD', 'inline-assignee')
 }
 
 function renderHangoutPrompt() {
@@ -1472,6 +1414,13 @@ async function handleAuthActionClick(event) {
   }
 
   if (action === 'signout') {
+    if (state.simulatedAuth && !state.session) {
+      clearSimulatedAuthState()
+      state.userEmail = ''
+      render()
+      return
+    }
+
     const { error } = await supabase.auth.signOut()
     if (error) {
       window.alert('Sign-out failed: ' + error.message)
