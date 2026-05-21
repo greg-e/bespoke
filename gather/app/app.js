@@ -7,6 +7,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 const STORAGE_PREFIX = 'gather-june-2026:'
 const DRAFT_STORAGE_KEY = STORAGE_PREFIX + 'drafts'
 const SIMULATED_AUTH_KEY = STORAGE_PREFIX + 'simulated-auth'
+const ACTIVITY_ATTACHMENTS_BUCKET = 'attachments'
 
 const drafts = loadDrafts()
 const editStatus = {}
@@ -549,18 +550,87 @@ function renderSequenceSelect(dayActivities, activity) {
   return '<select class="activity-select activity-select--sequence" data-edit-path="activities.entries.' + escapeHtml(activity.id) + '.sequence"' + disabledAttr + '>' + renderSelectOptions(options, String(activity.sequence || 1)) + '</select>'
 }
 
+function normalizeExternalUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) return raw
+  if (/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return 'https://' + raw
+  return ''
+}
+
+function getAttachmentFileName(pathValue) {
+  const raw = String(pathValue || '').trim()
+  if (!raw) return ''
+  const parts = raw.split('/')
+  return parts[parts.length - 1] || raw
+}
+
+function getAttachmentPublicUrl(pathValue) {
+  const raw = String(pathValue || '').trim()
+  if (!raw) return ''
+  const { data } = supabase.storage.from(ACTIVITY_ATTACHMENTS_BUCKET).getPublicUrl(raw)
+  return data?.publicUrl || ''
+}
+
+function sanitizeAttachmentFileName(fileName) {
+  return String(fileName || 'attachment')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+}
+
+function renderLinkField(linkPath, linkValue) {
+  const editable = renderEditableText(linkPath, linkValue, 'Add link', 'inline-activity-link')
+  const normalized = normalizeExternalUrl(linkValue)
+  if (!normalized) {
+    return editable
+  }
+
+  return [
+    editable,
+    '<a class="activity-inline-link" href="' + escapeHtml(normalized) + '" target="_blank" rel="noopener">Open link</a>',
+  ].join('')
+}
+
+function renderAttachmentField(activity) {
+  const currentPath = activity.attachmentPath || ''
+  const fileName = getAttachmentFileName(currentPath)
+  const publicUrl = getAttachmentPublicUrl(currentPath)
+  const statusPath = 'activities.entries.' + activity.id + '.attachment_path'
+  const statusClass = editStatus[statusPath] ? ' is-' + editStatus[statusPath] : ''
+
+  const parts = []
+  parts.push('<div class="activity-attachment-control' + statusClass + '">')
+  if (publicUrl) {
+    parts.push('<a class="activity-inline-link" href="' + escapeHtml(publicUrl) + '" target="_blank" rel="noopener">' + escapeHtml(fileName || 'Open attachment') + '</a>')
+    parts.push('<button type="button" class="activity-attachment-clear" data-attachment-clear-id="' + escapeHtml(activity.id) + '">Remove</button>')
+  }
+  parts.push('<input class="activity-attachment-input" type="file" data-activity-id="' + escapeHtml(activity.id) + '" />')
+  parts.push('<div class="activity-attachment-hint">Uploads to Supabase Storage</div>')
+  parts.push('</div>')
+
+  return parts.join('')
+}
+
 function renderActivityCard(dayDate, dayActivities, activity) {
   // View-only mode for non-authenticated users
   if (!canEdit()) {
-    const title = activity.title || 'Untitled'
-    const time = activity.time ? ' - ' + activity.time : ''
-    const assignment = activity.assignment ? ' - ' + activity.assignment : ''
-    const note = activity.note ? ' - ' + activity.note : ''
-    const link = activity.link ? ' - ' + activity.link : ''
-    const attachment = activity.attachmentPath ? ' - ' + activity.attachmentPath : ''
-    
-    const displayText = title + time + assignment + note + link + attachment
-    return '<div class="activity">' + escapeHtml(displayText) + '</div>'
+    const rows = []
+    rows.push('<div class="activity"><strong>' + escapeHtml(activity.title || 'Untitled') + '</strong></div>')
+    if (activity.time) rows.push('<div class="activity">Time: ' + escapeHtml(activity.time) + '</div>')
+    if (activity.assignment) rows.push('<div class="activity">Assignment: ' + escapeHtml(activity.assignment) + '</div>')
+    if (activity.note) rows.push('<div class="activity">Note: ' + escapeHtml(activity.note) + '</div>')
+
+    const linkUrl = normalizeExternalUrl(activity.link)
+    if (linkUrl) {
+      rows.push('<div class="activity">Link: <a class="activity-inline-link" href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener">Open link</a></div>')
+    }
+
+    const attachmentUrl = getAttachmentPublicUrl(activity.attachmentPath)
+    if (attachmentUrl) {
+      rows.push('<div class="activity">Attachment: <a class="activity-inline-link" href="' + escapeHtml(attachmentUrl) + '" target="_blank" rel="noopener">' + escapeHtml(getAttachmentFileName(activity.attachmentPath) || 'Open attachment') + '</a></div>')
+    }
+
+    return rows.join('')
   }
 
   // Edit mode for authenticated users
@@ -568,13 +638,11 @@ function renderActivityCard(dayDate, dayActivities, activity) {
   const timePath = 'activities.entries.' + activity.id + '.time'
   const notePath = 'activities.entries.' + activity.id + '.note'
   const linkPath = 'activities.entries.' + activity.id + '.link'
-  const attachmentPath = 'activities.entries.' + activity.id + '.attachment_path'
   const assignmentPath = 'activities.entries.' + activity.id + '.assignment'
   const title = getEditableValue(titlePath, activity.title || '')
   const time = getEditableValue(timePath, activity.time || '')
   const note = getEditableValue(notePath, activity.note || '')
   const link = getEditableValue(linkPath, activity.link || '')
-  const attachmentPathValue = getEditableValue(attachmentPath, activity.attachmentPath || '')
   const assignment = getEditableValue(assignmentPath, activity.assignment || '')
   const deleteDisabledAttr = ''
 
@@ -592,8 +660,8 @@ function renderActivityCard(dayDate, dayActivities, activity) {
     '<div class="activity-card__field"><span class="activity-label">Time</span>' + renderEditableText(timePath, time, 'Add time', 'inline-activity-time') + '</div>',
     '<div class="activity-card__field"><span class="activity-label">Assignment</span>' + renderEditableText(assignmentPath, assignment, 'Add assignment', 'inline-activity-assignment') + '</div>',
     '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Note</span>' + renderEditableText(notePath, note, 'Add note', 'inline-activity-note') + '</div>',
-    '<div class="activity-card__field"><span class="activity-label">Link</span>' + renderEditableText(linkPath, link, 'Add link', 'inline-activity-link') + '</div>',
-    '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Attachment</span>' + renderEditableText(attachmentPath, attachmentPathValue, 'Add attachment path', 'inline-activity-attachment') + '</div>',
+    '<div class="activity-card__field"><span class="activity-label">Link</span>' + renderLinkField(linkPath, link) + '</div>',
+    '<div class="activity-card__field activity-card__field--wide"><span class="activity-label">Attachment</span>' + renderAttachmentField(activity) + '</div>',
     '</div>',
     '</li>',
   ].join('')
@@ -616,7 +684,7 @@ function renderActivityCreateForm(dayDate, dayActivities) {
     '<label class="activity-create-form__wide"><span class="activity-label">Note</span><textarea name="note" rows="2" placeholder="Optional note"' + disabledAttr + '></textarea></label>',
     '<label><span class="activity-label">Assignment</span><input name="assignment" type="text" placeholder="Add assignment"' + disabledAttr + ' /></label>',
     '<label><span class="activity-label">Link</span><input name="link" type="text" placeholder="Optional URL"' + disabledAttr + ' /></label>',
-    '<label class="activity-create-form__wide"><span class="activity-label">Attachment path</span><input name="attachment_path" type="text" placeholder="Optional storage path"' + disabledAttr + ' /></label>',
+    '<label class="activity-create-form__wide"><span class="activity-label">Attachment</span><input name="attachment_file" type="file"' + disabledAttr + ' /></label>',
     '<label><span class="activity-label">Sequence</span><select name="sequence"' + disabledAttr + '>' + renderSelectOptions(sequenceOptions, sequenceOptions.length ? sequenceOptions[sequenceOptions.length - 1].value : '1') + '</select></label>',
     '</div>',
     '<div class="activity-create-form__actions"><button type="submit"' + disabledAttr + '>Add activity</button></div>',
@@ -677,6 +745,7 @@ async function handleActivityCreateSubmit(event) {
   const sequenceValue = Number(formData.get('sequence') || existingActivities.length + 1);
   const targetSequence = Math.max(1, Math.min(sequenceValue, existingActivities.length + 1));
   const assignmentValue = String(formData.get('assignment') || '').trim();
+  const attachmentFile = formData.get('attachment_file');
 
   const insertPayload = {
     schedule_day_id: day.id,
@@ -686,7 +755,7 @@ async function handleActivityCreateSubmit(event) {
     note: String(formData.get('note') || '').trim() || null,
     assignment: assignmentValue || null,
     link: String(formData.get('link') || '').trim() || null,
-    attachment_path: String(formData.get('attachment_path') || '').trim() || null,
+    attachment_path: null,
   }
 
   const { data, error } = await supabase
@@ -710,6 +779,21 @@ async function handleActivityCreateSubmit(event) {
     link: data.link,
     attachmentPath: data.attachment_path,
   };
+
+  if (attachmentFile instanceof File && attachmentFile.size > 0) {
+    try {
+      const uploadedPath = await uploadAttachmentToStorage(data.id, attachmentFile, null)
+      const { error: attachmentUpdateError } = await supabase
+        .from('activities')
+        .update({ attachment_path: uploadedPath })
+        .eq('id', data.id)
+
+      if (attachmentUpdateError) throw attachmentUpdateError
+      newActivity.attachmentPath = uploadedPath
+    } catch (attachmentError) {
+      window.alert('Activity created, but attachment upload failed: ' + (attachmentError?.message ?? String(attachmentError)))
+    }
+  }
 
   const cachedAssignments = state.data.activityAssignments?.content?.entries;
   if (cachedAssignments) {
@@ -807,6 +891,101 @@ async function handleActivitySelectChange(event) {
   }
 }
 
+async function uploadAttachmentToStorage(activityId, file, existingPath) {
+  const safeName = sanitizeAttachmentFileName(file.name)
+  const storagePath = 'activities/' + activityId + '/' + Date.now() + '-' + safeName
+
+  const { error: uploadError } = await supabase.storage
+    .from(ACTIVITY_ATTACHMENTS_BUCKET)
+    .upload(storagePath, file, { upsert: false })
+
+  if (uploadError) {
+    throw uploadError
+  }
+
+  if (existingPath) {
+    await supabase.storage.from(ACTIVITY_ATTACHMENTS_BUCKET).remove([existingPath])
+  }
+
+  return storagePath
+}
+
+async function handleAttachmentInputChange(event) {
+  if (!canEdit()) return
+
+  const input = event.currentTarget
+  const activityId = input.dataset.activityId
+  const file = input.files && input.files[0]
+  if (!activityId || !file) return
+
+  const context = findActivityContextById(activityId)
+  if (!context.activity) return
+
+  const path = 'activities.entries.' + activityId + '.attachment_path'
+  setEditStatus(path, 'saving')
+  render()
+
+  try {
+    const uploadedPath = await uploadAttachmentToStorage(activityId, file, context.activity.attachmentPath || null)
+    const saved = await persistEditableValue(path, uploadedPath)
+    if (!saved) {
+      throw new Error('Could not save uploaded attachment path')
+    }
+
+    clearDraftValue(path)
+    setEditStatus(path, 'saved')
+    render()
+    setTimeout(() => {
+      if (editStatus[path] === 'saved') {
+        setEditStatus(path, null)
+        render()
+      }
+    }, 1200)
+  } catch (error) {
+    setEditStatus(path, 'error')
+    render()
+    window.alert('Attachment upload failed: ' + (error?.message ?? String(error)))
+  }
+}
+
+async function handleAttachmentClearClick(event) {
+  if (!canEdit()) return
+
+  const button = event.currentTarget
+  const activityId = button.dataset.attachmentClearId
+  if (!activityId) return
+
+  const context = findActivityContextById(activityId)
+  const existingPath = context.activity?.attachmentPath
+  if (!context.activity || !existingPath) return
+
+  const path = 'activities.entries.' + activityId + '.attachment_path'
+  setEditStatus(path, 'saving')
+  render()
+
+  try {
+    await supabase.storage.from(ACTIVITY_ATTACHMENTS_BUCKET).remove([existingPath])
+    const saved = await persistEditableValue(path, '')
+    if (!saved) {
+      throw new Error('Could not clear attachment path')
+    }
+
+    clearDraftValue(path)
+    setEditStatus(path, 'saved')
+    render()
+    setTimeout(() => {
+      if (editStatus[path] === 'saved') {
+        setEditStatus(path, null)
+        render()
+      }
+    }, 1200)
+  } catch (error) {
+    setEditStatus(path, 'error')
+    render()
+    window.alert('Failed to remove attachment: ' + (error?.message ?? String(error)))
+  }
+}
+
 function bindActivityControls() {
   const selects = document.querySelectorAll('.activity-select')
   for (const select of selects) {
@@ -827,6 +1006,20 @@ function bindActivityControls() {
     if (form.dataset.bound === 'true') continue
     form.dataset.bound = 'true'
     form.addEventListener('submit', handleActivityCreateSubmit)
+  }
+
+  const attachmentInputs = document.querySelectorAll('.activity-attachment-input')
+  for (const input of attachmentInputs) {
+    if (input.dataset.bound === 'true') continue
+    input.dataset.bound = 'true'
+    input.addEventListener('change', handleAttachmentInputChange)
+  }
+
+  const attachmentClearButtons = document.querySelectorAll('.activity-attachment-clear')
+  for (const button of attachmentClearButtons) {
+    if (button.dataset.bound === 'true') continue
+    button.dataset.bound = 'true'
+    button.addEventListener('click', handleAttachmentClearClick)
   }
 }
 
