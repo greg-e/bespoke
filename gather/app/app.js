@@ -1097,36 +1097,46 @@ function maybeTbd(text) {
 function renderAssignments() {
   const activityAssignments = state.data.activityAssignments?.content?.entries || []
 
+  // Only show assignments with a non-blank assignee
   const filtered = activityAssignments.filter((entry) => {
-    const text = `${entry.dayLabel} ${entry.title} ${entry.assignment || 'TBD'}`.toLowerCase()
-    return state.searchQuery === '' || text.includes(state.searchQuery)
-  })
+    if (!entry.assignment || !entry.assignment.trim()) return false;
+    const text = `${entry.dayLabel} ${entry.title} ${entry.assignment}`.toLowerCase();
+    return state.searchQuery === '' || text.includes(state.searchQuery);
+  });
 
+  // Sort by date (dayLabel), then by sequence, then by title
   filtered.sort((a, b) => {
-    const dayCompare = String(a.dayLabel || '').localeCompare(String(b.dayLabel || ''))
-    if (dayCompare !== 0) return dayCompare
-    return a.sequence - b.sequence || a.title.localeCompare(b.title)
-  })
+    // Try to parse dayLabel as a date, fallback to string compare
+    const dateA = Date.parse(a.dayLabel);
+    const dateB = Date.parse(b.dayLabel);
+    if (!isNaN(dateA) && !isNaN(dateB)) {
+      if (dateA !== dateB) return dateA - dateB;
+    } else {
+      const dayCompare = String(a.dayLabel || '').localeCompare(String(b.dayLabel || ''));
+      if (dayCompare !== 0) return dayCompare;
+    }
+    return a.sequence - b.sequence || a.title.localeCompare(b.title);
+  });
 
-  el.assignmentsList.innerHTML = ''
+  el.assignmentsList.innerHTML = '';
 
   if (filtered.length === 0) {
-    el.assignmentsList.innerHTML = '<p style="padding: 1rem; color: var(--muted);">No assignments found.</p>'
-    return
+    el.assignmentsList.innerHTML = '<p style="padding: 1rem; color: var(--muted);">No assignments found.</p>';
+    return;
   }
 
   for (const entry of filtered) {
-    const item = document.createElement('div')
-    item.className = 'assignment-item'
+    const item = document.createElement('div');
+    item.className = 'assignment-item';
     item.innerHTML = `
       <div class="assignment-day">${escapeHtml(entry.dayLabel)}</div>
       <div class="assignment-type">${escapeHtml(entry.title)}</div>
       <div class="assignment-person">${renderAssignmentDetails(entry)}</div>
-    `
-    el.assignmentsList.appendChild(item)
+    `;
+    el.assignmentsList.appendChild(item);
   }
 
-  bindEditableFields()
+  bindEditableFields();
 }
 
 function renderFood() {
