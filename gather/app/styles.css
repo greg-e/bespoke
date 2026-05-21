@@ -634,6 +634,10 @@ h1 {
   align-self: center;
 }
 
+.activity-card__title--top {
+  align-self: start;
+}
+
 .activity-card__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

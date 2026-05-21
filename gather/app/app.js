@@ -580,12 +580,12 @@ function renderActivityCard(dayDate, dayActivities, activity) {
 
   return [
     '<li class="activity-card" data-activity-id="' + escapeHtml(activity.id) + '">',
+    '<div class="activity-card__title activity-card__title--top">' + renderEditableText(titlePath, title, 'Add title', 'inline-activity-title') + '</div>',
     '<div class="activity-card__top">',
     '<div class="activity-card__sequence">',
     '<span class="activity-label">Sequence</span>',
     renderSequenceSelect(dayActivities, activity),
     '</div>',
-    '<div class="activity-card__title">' + renderEditableText(titlePath, title, 'Add title', 'inline-activity-title') + '</div>',
     '<button class="activity-delete-button" type="button" data-delete-activity-id="' + escapeHtml(activity.id) + '" data-day-date="' + escapeHtml(dayDate) + '"' + deleteDisabledAttr + '>Delete</button>',
     '</div>',
     '<div class="activity-card__grid">',
