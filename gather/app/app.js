@@ -350,7 +350,7 @@ async function loadFood() {
   try {
     const { data, error } = await supabase
       .from('food_metadata')
-      .select('summary, shopping_doc_url, allergies, kitchen_notes, extra_requests, updated_at')
+      .select('title, summary, shopping_doc_url, allergies, kitchen_notes, extra_requests, allergies_heading, kitchen_notes_heading, extra_requests_heading, updated_at')
       .eq('id', 1)
       .order('updated_at', { ascending: false })
       .limit(1)
@@ -367,11 +367,15 @@ async function loadFood() {
 
     return {
       content: {
+        title: row.title || 'Food & Meal Planning',
         summary: row.summary,
         shoppingDocUrl: row.shopping_doc_url,
         allergies: row.allergies || [],
         kitchenNotes: row.kitchen_notes || [],
         extraRequests: row.extra_requests || [],
+        allergiesHeading: row.allergies_heading || 'Allergies & Dietary Notes',
+        kitchenNotesHeading: row.kitchen_notes_heading || 'Kitchen Notes',
+        extraRequestsHeading: row.extra_requests_heading || 'Extra Requests',
       },
       source: 'network',
     }
@@ -1141,41 +1145,53 @@ function renderAssignments() {
 
 function renderFood() {
   const food = state.data.food.content
+  const foodTitle = getEditableValue('food.title', food.title || 'Food & Meal Planning')
+  const foodSummary = getEditableValue('food.summary', food.summary || '')
+  const allergiesHeading = getEditableValue('food.allergiesHeading', food.allergiesHeading || 'Allergies & Dietary Notes')
+  const kitchenNotesHeading = getEditableValue('food.kitchenNotesHeading', food.kitchenNotesHeading || 'Kitchen Notes')
+  const extraRequestsHeading = getEditableValue('food.extraRequestsHeading', food.extraRequestsHeading || 'Extra Requests')
+  const allergies = food.allergies || []
+  const kitchenNotes = food.kitchenNotes || []
+  const extraRequests = food.extraRequests || []
 
   let html = '<div class="food-view">'
 
-  html += '<h2>Food & Meal Planning</h2>'
-  if (food.summary) {
-    html += '<p>' + escapeHtml(food.summary) + '</p>'
-  }
+  html += '<h2>' + renderEditableText('food.title', foodTitle, 'Food & Meal Planning', 'inline-food-title') + '</h2>'
+  html += '<p>' + renderEditableText('food.summary', foodSummary, 'Add summary', 'inline-food-summary') + '</p>'
 
   if (food.shoppingDocUrl) {
     html += `<p><a href="${escapeHtml(food.shoppingDocUrl)}" target="_blank" style="color: var(--text); text-decoration: underline; font-weight: 500;">Open Shopping List (Google Doc)</a></p>`
   }
 
-  if (food.allergies && food.allergies.length > 0) {
-    html += '<h3 style="margin-top: 1.5rem;">Allergies & Dietary Notes</h3>'
+  if (allergies.length > 0) {
+    html += '<h3 style="margin-top: 1.5rem;">' + renderEditableText('food.allergiesHeading', allergiesHeading, 'Allergies & Dietary Notes', 'inline-food-heading') + '</h3>'
     html += '<ul style="margin: 0.5rem 0 0 1.5rem;">'
-    for (const allergy of food.allergies) {
-      html += '<li>' + escapeHtml(allergy) + '</li>'
+    for (const [index, allergy] of allergies.entries()) {
+      const path = 'food.allergies.' + index
+      const value = getEditableValue(path, allergy)
+      html += '<li>' + renderEditableText(path, value, 'Add allergy note', 'inline-food-item') + '</li>'
     }
     html += '</ul>'
   }
 
-  if (food.kitchenNotes && food.kitchenNotes.length > 0) {
-    html += '<h3 style="margin-top: 1.5rem;">Kitchen Notes</h3>'
+  if (kitchenNotes.length > 0) {
+    html += '<h3 style="margin-top: 1.5rem;">' + renderEditableText('food.kitchenNotesHeading', kitchenNotesHeading, 'Kitchen Notes', 'inline-food-heading') + '</h3>'
     html += '<ul style="margin: 0.5rem 0 0 1.5rem;">'
-    for (const note of food.kitchenNotes) {
-      html += '<li>' + escapeHtml(note) + '</li>'
+    for (const [index, note] of kitchenNotes.entries()) {
+      const path = 'food.kitchenNotes.' + index
+      const value = getEditableValue(path, note)
+      html += '<li>' + renderEditableText(path, value, 'Add kitchen note', 'inline-food-item') + '</li>'
     }
     html += '</ul>'
   }
 
-  if (food.extraRequests && food.extraRequests.length > 0) {
-    html += '<h3 style="margin-top: 1.5rem;">Extra Requests</h3>'
+  if (extraRequests.length > 0) {
+    html += '<h3 style="margin-top: 1.5rem;">' + renderEditableText('food.extraRequestsHeading', extraRequestsHeading, 'Extra Requests', 'inline-food-heading') + '</h3>'
     html += '<ul style="margin: 0.5rem 0 0 1.5rem;">'
-    for (const request of food.extraRequests) {
-      html += '<li>' + escapeHtml(request) + '</li>'
+    for (const [index, request] of extraRequests.entries()) {
+      const path = 'food.extraRequests.' + index
+      const value = getEditableValue(path, request)
+      html += '<li>' + renderEditableText(path, value, 'Add extra request', 'inline-food-item') + '</li>'
     }
     html += '</ul>'
   }
@@ -1183,6 +1199,7 @@ function renderFood() {
   html += '</div>'
 
   el.foodContent.innerHTML = html
+  bindEditableFields()
 }
 
 function renderSystem() {
@@ -1417,21 +1434,30 @@ async function persistEditableValue(path, value) {
       return true
     }
 
-    const foodSummaryMatch = path.match(/^food\.(summary)$/)
-    if (foodSummaryMatch) {
+    const foodScalarMatch = path.match(/^food\.(title|summary|allergiesHeading|kitchenNotesHeading|extraRequestsHeading)$/)
+    if (foodScalarMatch) {
+      const field = foodScalarMatch[1]
       const food = state.data.food?.content
       if (!food) {
         throw new Error('Food metadata missing in state')
       }
 
-      const nextSummary = normalized || food.summary
+      const dbColMap = {
+        title: 'title',
+        summary: 'summary',
+        allergiesHeading: 'allergies_heading',
+        kitchenNotesHeading: 'kitchen_notes_heading',
+        extraRequestsHeading: 'extra_requests_heading',
+      }
+      const dbCol = dbColMap[field]
+      const nextValue = normalized || food[field]
       const { error } = await supabase
         .from('food_metadata')
-        .update({ summary: nextSummary })
+        .update({ [dbCol]: nextValue })
         .eq('id', 1)
 
       if (error) throw error
-      food.summary = nextSummary
+      food[field] = nextValue
       return true
     }
 
