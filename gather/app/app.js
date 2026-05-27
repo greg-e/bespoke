@@ -40,6 +40,7 @@ const el = {
   assignmentSearch: document.getElementById('assignment-search'),
   assignmentsList: document.getElementById('assignments-list'),
   foodContent: document.getElementById('food-content'),
+  bringContent: document.getElementById('bring-content'),
   systemContent: document.getElementById('system-content'),
   systemTab: document.querySelector('.nav-tab[data-view="system"]'),
 }
@@ -223,7 +224,7 @@ async function loadSiteMetadata() {
   try {
     const { data, error } = await supabase
       .from('site_metadata')
-      .select('title, subtitle, date_start, date_end, location_name, address_line1, address_line2, map_open_url, map_embed_url, updated_at')
+      .select('title, subtitle, date_start, date_end, location_name, address_line1, address_line2, map_open_url, map_embed_url, what_to_bring, updated_at')
       .eq('id', 1)
       .order('updated_at', { ascending: false })
       .limit(1)
@@ -253,6 +254,7 @@ async function loadSiteMetadata() {
           mapOpenUrl: row.map_open_url,
           mapEmbedUrl: row.map_embed_url,
         },
+        whatToBring: row.what_to_bring || '',
       },
       source: 'network',
     }
@@ -410,9 +412,93 @@ function render() {
     renderAssignments()
   } else if (state.currentView === 'food') {
     renderFood()
+  } else if (state.currentView === 'bring') {
+    renderWhatToBring()
   } else if (state.currentView === 'system') {
     renderSystem()
   }
+}
+
+function renderParagraphText(text) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').trim()
+  if (!normalized) {
+    return '<p class="bring-empty">No details added yet.</p>'
+  }
+
+  return normalized
+    .split(/\n\s*\n/)
+    .map((paragraph) => '<p>' + escapeHtml(paragraph.trim()).replace(/\n/g, '<br />') + '</p>')
+    .join('')
+}
+
+function renderWhatToBring() {
+  const site = state.data.site.content
+  const bringPath = 'site.whatToBring'
+  const bringText = getEditableValue(bringPath, site.whatToBring || '')
+  const status = editStatus[bringPath] || ''
+
+  let html = '<div class="bring-view">'
+  html += '<h2>What to Bring</h2>'
+  html += '<div class="bring-copy">' + renderParagraphText(bringText) + '</div>'
+
+  if (canEdit()) {
+    html += '<div class="bring-editor">'
+    html += '<label for="bring-textarea" class="bring-editor-label">Edit bring list (use blank lines between paragraphs)</label>'
+    html += '<textarea id="bring-textarea" class="bring-textarea" rows="10" placeholder="Add what people should bring...">' + escapeHtml(bringText) + '</textarea>'
+    html += '<div class="bring-editor-actions">'
+    html += '<button id="bring-save" type="button">Save</button>'
+    html += '<span class="bring-save-status' + (status ? ' is-' + status : '') + '">' + (status ? ('Status: ' + status) : '') + '</span>'
+    html += '</div>'
+    html += '</div>'
+  }
+
+  html += '</div>'
+  el.bringContent.innerHTML = html
+  bindWhatToBringControls()
+}
+
+function bindWhatToBringControls() {
+  const saveButton = document.getElementById('bring-save')
+  const textarea = document.getElementById('bring-textarea')
+
+  if (!saveButton || !textarea || saveButton.dataset.bound === 'true') {
+    return
+  }
+
+  saveButton.dataset.bound = 'true'
+  saveButton.addEventListener('click', async () => {
+    if (!canEdit()) return
+
+    const path = 'site.whatToBring'
+    const nextValue = String(textarea.value || '').trim()
+
+    setEditStatus(path, 'saving')
+    render()
+
+    const saved = await persistEditableValue(path, nextValue)
+    if (saved) {
+      clearDraftValue(path)
+      setEditStatus(path, 'saved')
+      render()
+      setTimeout(() => {
+        if (editStatus[path] === 'saved') {
+          setEditStatus(path, null)
+          render()
+        }
+      }, 1200)
+      return
+    }
+
+    setDraftValue(path, nextValue)
+    setEditStatus(path, 'error')
+    render()
+    setTimeout(() => {
+      if (editStatus[path] === 'error') {
+        setEditStatus(path, null)
+        render()
+      }
+    }, 2000)
+  })
 }
 
 function renderFooterStatus() {
@@ -1399,7 +1485,7 @@ async function persistEditableValue(path, value) {
       return true
     }
 
-    const siteMatch = path.match(/^site\.(title|location\.name|location\.addressLine1|location\.addressLine2|location\.mapOpenUrl)$/)
+    const siteMatch = path.match(/^site\.(title|location\.name|location\.addressLine1|location\.addressLine2|location\.mapOpenUrl|whatToBring)$/)
     if (siteMatch) {
       const site = state.data.site?.content
       if (!site) {
@@ -1417,6 +1503,8 @@ async function persistEditableValue(path, value) {
         updates.address_line2 = normalized
       } else if (path === 'site.location.mapOpenUrl') {
         updates.map_open_url = normalized || site.location.mapOpenUrl
+      } else if (path === 'site.whatToBring') {
+        updates.what_to_bring = normalized
       }
 
       const { error } = await supabase
@@ -1431,6 +1519,7 @@ async function persistEditableValue(path, value) {
       if (path === 'site.location.addressLine1') site.location.addressLine1 = updates.address_line1
       if (path === 'site.location.addressLine2') site.location.addressLine2 = updates.address_line2
       if (path === 'site.location.mapOpenUrl') site.location.mapOpenUrl = updates.map_open_url
+      if (path === 'site.whatToBring') site.whatToBring = updates.what_to_bring
       return true
     }
 

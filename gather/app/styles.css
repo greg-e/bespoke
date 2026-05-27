@@ -288,6 +288,78 @@ h1 {
   gap: 1rem;
 }
 
+.bring-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.bring-copy {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--surface);
+}
+
+.bring-copy p {
+  margin: 0 0 0.9rem;
+  line-height: 1.55;
+}
+
+.bring-copy p:last-child {
+  margin-bottom: 0;
+}
+
+.bring-empty {
+  color: var(--muted);
+}
+
+.bring-editor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--surface);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.bring-editor-label {
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.bring-textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  padding: 0.7rem;
+  resize: vertical;
+  min-height: 12rem;
+}
+
+.bring-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bring-save-status {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.bring-save-status.is-saving {
+  color: #92400e;
+}
+
+.bring-save-status.is-saved {
+  color: #14532d;
+}
+
+.bring-save-status.is-error {
+  color: #991b1b;
+}
+
 .system-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
