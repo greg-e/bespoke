@@ -19,6 +19,8 @@ create table if not exists public.site_metadata (
   address_line2 text not null,
   map_open_url text not null,
   map_embed_url text,
+  what_to_bring text not null default '',
+  worship_songs text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint site_metadata_singleton check (id = 1)
@@ -34,7 +36,9 @@ insert into public.site_metadata (
   address_line1,
   address_line2,
   map_open_url,
-  map_embed_url
+  map_embed_url,
+  what_to_bring,
+  worship_songs
 )
 values (
   1,
@@ -46,7 +50,9 @@ values (
   '64 Deerpath',
   'Tracy, MN 56175',
   'https://www.google.com/maps/search/?api=1&query=64+Deerpath,+Tracy,+MN+56175',
-  'https://www.google.com/maps?q=64+Deerpath,+Tracy,+MN+56175&output=embed'
+  'https://www.google.com/maps?q=64+Deerpath,+Tracy,+MN+56175&output=embed',
+  '',
+  ''
 )
 on conflict (id) do update
   set title = excluded.title,
@@ -58,6 +64,8 @@ on conflict (id) do update
       address_line2 = excluded.address_line2,
       map_open_url = excluded.map_open_url,
       map_embed_url = excluded.map_embed_url,
+      what_to_bring = excluded.what_to_bring,
+      worship_songs = excluded.worship_songs,
       updated_at = now();
 
 create trigger set_site_metadata_updated_at

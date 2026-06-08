@@ -41,6 +41,7 @@ const el = {
   assignmentsList: document.getElementById('assignments-list'),
   foodContent: document.getElementById('food-content'),
   bringContent: document.getElementById('bring-content'),
+  worshipContent: document.getElementById('worship-content'),
   systemContent: document.getElementById('system-content'),
   systemTab: document.querySelector('.nav-tab[data-view="system"]'),
 }
@@ -221,15 +222,55 @@ function syncSystemTabVisibility() {
 }
 
 async function loadSiteMetadata() {
-  try {
-    const { data, error } = await supabase
+  const query = () => supabase
       .from('site_metadata')
-      .select('title, subtitle, date_start, date_end, location_name, address_line1, address_line2, map_open_url, map_embed_url, what_to_bring, updated_at')
+      .select('title, subtitle, date_start, date_end, location_name, address_line1, address_line2, map_open_url, map_embed_url, what_to_bring, worship_songs, updated_at')
       .eq('id', 1)
       .order('updated_at', { ascending: false })
       .limit(1)
 
+  try {
+    const { data, error } = await query()
+
     if (error) {
+      if (String(error.message || '').includes('worship_songs')) {
+        const fallback = await supabase
+          .from('site_metadata')
+          .select('title, subtitle, date_start, date_end, location_name, address_line1, address_line2, map_open_url, map_embed_url, what_to_bring, updated_at')
+          .eq('id', 1)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+
+        if (fallback.error) {
+          throw fallback.error
+        }
+
+        if (!fallback.data || fallback.data.length === 0) {
+          throw new Error('No site metadata row found')
+        }
+
+        const row = fallback.data[0]
+        return {
+          content: {
+            title: row.title,
+            subtitle: row.subtitle || '',
+            dateRange: {
+              start: row.date_start,
+              end: row.date_end,
+            },
+            location: {
+              name: row.location_name,
+              addressLine1: row.address_line1,
+              addressLine2: row.address_line2,
+              mapOpenUrl: row.map_open_url,
+              mapEmbedUrl: row.map_embed_url,
+            },
+            whatToBring: row.what_to_bring || '',
+            worshipSongs: '',
+          },
+          source: 'network',
+        }
+      }
       throw error
     }
 
@@ -255,6 +296,7 @@ async function loadSiteMetadata() {
           mapEmbedUrl: row.map_embed_url,
         },
         whatToBring: row.what_to_bring || '',
+        worshipSongs: row.worship_songs || '',
       },
       source: 'network',
     }
@@ -414,6 +456,8 @@ function render() {
     renderFood()
   } else if (state.currentView === 'bring') {
     renderWhatToBring()
+  } else if (state.currentView === 'worship') {
+    renderWorshipSongs()
   } else if (state.currentView === 'system') {
     renderSystem()
   }
@@ -435,9 +479,10 @@ function renderWhatToBring() {
   const site = state.data.site.content
   const bringPath = 'site.whatToBring'
   const bringText = getEditableValue(bringPath, site.whatToBring || '')
-  const status = editStatus[bringPath] || ''
+  const bringStatus = editStatus[bringPath] || ''
 
   let html = '<div class="bring-view">'
+  html += '<section class="bring-section">'
   html += '<h2>What to Bring</h2>'
   html += '<div class="bring-copy">' + renderParagraphText(bringText) + '</div>'
 
@@ -447,58 +492,95 @@ function renderWhatToBring() {
     html += '<textarea id="bring-textarea" class="bring-textarea" rows="10" placeholder="Add what people should bring...">' + escapeHtml(bringText) + '</textarea>'
     html += '<div class="bring-editor-actions">'
     html += '<button id="bring-save" type="button">Save</button>'
-    html += '<span class="bring-save-status' + (status ? ' is-' + status : '') + '">' + (status ? ('Status: ' + status) : '') + '</span>'
+    html += '<span class="bring-save-status' + (bringStatus ? ' is-' + bringStatus : '') + '">' + (bringStatus ? ('Status: ' + bringStatus) : '') + '</span>'
     html += '</div>'
     html += '</div>'
   }
 
+  html += '</section>'
   html += '</div>'
+
   el.bringContent.innerHTML = html
   bindWhatToBringControls()
 }
 
-function bindWhatToBringControls() {
-  const saveButton = document.getElementById('bring-save')
-  const textarea = document.getElementById('bring-textarea')
+function renderWorshipSongs() {
+  const site = state.data.site.content
+  const worshipPath = 'site.worshipSongs'
+  const worshipText = getEditableValue(worshipPath, site.worshipSongs || '')
+  const worshipStatus = editStatus[worshipPath] || ''
 
-  if (!saveButton || !textarea || saveButton.dataset.bound === 'true') {
-    return
+  let html = '<div class="bring-view">'
+  html += '<section class="bring-section">'
+  html += '<h2>Worship Songs</h2>'
+  html += '<div class="bring-copy">' + renderParagraphText(worshipText) + '</div>'
+
+  if (canEdit()) {
+    html += '<div class="bring-editor">'
+    html += '<label for="worship-textarea" class="bring-editor-label">Edit worship songs list (use blank lines between paragraphs)</label>'
+    html += '<textarea id="worship-textarea" class="bring-textarea" rows="14" placeholder="Add worship songs...">' + escapeHtml(worshipText) + '</textarea>'
+    html += '<div class="bring-editor-actions">'
+    html += '<button id="worship-save" type="button">Save</button>'
+    html += '<span class="bring-save-status' + (worshipStatus ? ' is-' + worshipStatus : '') + '">' + (worshipStatus ? ('Status: ' + worshipStatus) : '') + '</span>'
+    html += '</div>'
+    html += '</div>'
   }
 
-  saveButton.dataset.bound = 'true'
-  saveButton.addEventListener('click', async () => {
-    if (!canEdit()) return
+  html += '</section>'
+  html += '</div>'
 
-    const path = 'site.whatToBring'
-    const nextValue = String(textarea.value || '').trim()
+  el.worshipContent.innerHTML = html
+  bindWhatToBringControls()
+}
 
-    setEditStatus(path, 'saving')
-    render()
+function bindWhatToBringControls() {
+  const controlEntries = [
+    { buttonId: 'bring-save', textareaId: 'bring-textarea', path: 'site.whatToBring' },
+    { buttonId: 'worship-save', textareaId: 'worship-textarea', path: 'site.worshipSongs' },
+  ]
 
-    const saved = await persistEditableValue(path, nextValue)
-    if (saved) {
-      clearDraftValue(path)
-      setEditStatus(path, 'saved')
+  for (const { buttonId, textareaId, path } of controlEntries) {
+    const saveButton = document.getElementById(buttonId)
+    const textarea = document.getElementById(textareaId)
+
+    if (!saveButton || !textarea || saveButton.dataset.bound === 'true') {
+      continue
+    }
+
+    saveButton.dataset.bound = 'true'
+    saveButton.addEventListener('click', async () => {
+      if (!canEdit()) return
+
+      const nextValue = String(textarea.value || '').trim()
+
+      setEditStatus(path, 'saving')
+      render()
+
+      const saved = await persistEditableValue(path, nextValue)
+      if (saved) {
+        clearDraftValue(path)
+        setEditStatus(path, 'saved')
+        render()
+        setTimeout(() => {
+          if (editStatus[path] === 'saved') {
+            setEditStatus(path, null)
+            render()
+          }
+        }, 1200)
+        return
+      }
+
+      setDraftValue(path, nextValue)
+      setEditStatus(path, 'error')
       render()
       setTimeout(() => {
-        if (editStatus[path] === 'saved') {
+        if (editStatus[path] === 'error') {
           setEditStatus(path, null)
           render()
         }
-      }, 1200)
-      return
-    }
-
-    setDraftValue(path, nextValue)
-    setEditStatus(path, 'error')
-    render()
-    setTimeout(() => {
-      if (editStatus[path] === 'error') {
-        setEditStatus(path, null)
-        render()
-      }
-    }, 2000)
-  })
+      }, 2000)
+    })
+  }
 }
 
 function renderFooterStatus() {
@@ -1485,7 +1567,7 @@ async function persistEditableValue(path, value) {
       return true
     }
 
-    const siteMatch = path.match(/^site\.(title|location\.name|location\.addressLine1|location\.addressLine2|location\.mapOpenUrl|whatToBring)$/)
+    const siteMatch = path.match(/^site\.(title|location\.name|location\.addressLine1|location\.addressLine2|location\.mapOpenUrl|whatToBring|worshipSongs)$/)
     if (siteMatch) {
       const site = state.data.site?.content
       if (!site) {
@@ -1505,6 +1587,8 @@ async function persistEditableValue(path, value) {
         updates.map_open_url = normalized || site.location.mapOpenUrl
       } else if (path === 'site.whatToBring') {
         updates.what_to_bring = normalized
+      } else if (path === 'site.worshipSongs') {
+        updates.worship_songs = normalized
       }
 
       const { error } = await supabase
@@ -1520,6 +1604,7 @@ async function persistEditableValue(path, value) {
       if (path === 'site.location.addressLine2') site.location.addressLine2 = updates.address_line2
       if (path === 'site.location.mapOpenUrl') site.location.mapOpenUrl = updates.map_open_url
       if (path === 'site.whatToBring') site.whatToBring = updates.what_to_bring
+      if (path === 'site.worshipSongs') site.worshipSongs = updates.worship_songs
       return true
     }
 
